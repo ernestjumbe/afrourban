@@ -1,0 +1,29 @@
+#!/bin/bash
+
+set -o errexit
+set -o pipefail
+set -o nounset
+
+
+>&2 echo 'Start prod setup'
+
+>&2 echo 'Make migrations'
+poetry run python manage.py makemigrations --settings=afrourban.settings.prod
+>&2 echo 'Migrating databse'
+poetry run python manage.py migrate --settings=afrourban.settings.prod
+>&2 echo 'Collecting static files'
+poetry run python manage.py collectstatic --ignore ts --ignore debug_toolbar --ignore django_extensions --noinput --settings=afrourban.settings.prod
+
+if [ "$DJANGO_SUPERUSER_USERNAME" ]
+then
+    >&2 echo 'Creating superuser'
+    poetry run python manage.py createsuperuser --settings=afrourban.settings.prod \
+        --noinput \
+        --username $DJANGO_SUPERUSER_USERNAME \
+        --email $DJANGO_SUPERUSER_EMAIL
+fi
+
+$@
+
+>&2 echo 'Starting prod server'
+gunicorn afrourban.wsgi:application

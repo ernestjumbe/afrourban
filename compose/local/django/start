@@ -1,0 +1,54 @@
+#!/bin/bash
+
+set -o errexit
+set -o pipefail
+set -o nounset
+
+
+>&2 echo 'Start staging setup'
+
+>&2 echo 'Make migrations'
+python manage.py makemigrations
+>&2 echo 'Migrating databse'
+python manage.py migrate
+>&2 echo 'Collecting static files'
+python manage.py collectstatic --ignore ts --ignore debug_toolbar --ignore django_extensions --noinput
+
+TMPFILE=$(mktemp) || { echo "Failed to create temp file"; exit 1; }
+
+set +e
+if [ "$DJANGO_SUPERUSER_USERNAME" ]
+then
+    >&2 echo 'Creating superuser'
+    python manage.py createsuperuser \
+        --noinput \
+        --username $DJANGO_SUPERUSER_USERNAME \
+        --email $DJANGO_SUPERUSER_EMAIL 2> $TMPFILE
+        EXIT_CODE=$?
+        set -e
+fi
+
+$@
+
+# Check if the command failed
+if [[ $EXIT_CODE -ne 0 ]]; then
+    # Check if the error matches the specific message
+    if grep -q "CommandError: Error: That username is already taken." "$TMPFILE"; then
+        echo "Warning: Username already taken. Continuing script..."
+    elif grep -q "CommandError: Error: That email is already taken." "$TMPFILE"; then
+        echo "Warning: Email address already taken. Continuing script..."
+    else
+        # Display unexpected error and exit
+        echo "Unexpected error:"
+        cat "$TMPFILE"
+        rm "$TMPFILE"
+        exit $EXIT_CODE
+    fi
+fi
+
+# Cleanup and continue
+rm "$TMPFILE"
+echo "Script continues..."
+
+>&2 echo 'Starting staging server'
+python manage.py runserver_plus 0.0.0.0:8000

@@ -1,0 +1,19 @@
+services:
+  django:
+    env_file: env/.env.docker
+    restart: unless-stopped
+    build:
+      context: .
+      # target: runtime
+      dockerfile: ./compose/local/django/Dockerfile
+    command: /start
+    ports:
+      - '8000:8000'
+    volumes:
+      - .:/app
+    # healthcheck:
+    #   test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health/"]
+    #   interval: 30s
+    #   timeout: 10s
+    #   retries: 3
+    #   start_period: 40s
