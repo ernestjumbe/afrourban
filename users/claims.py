@@ -1,7 +1,8 @@
 """JWT claims builder for embedding user policies in tokens.
 
 This module provides functions to build custom claims that are
-embedded in JWT tokens, including user roles, permissions, and policies.
+embedded in JWT tokens, including user roles, permissions, policies,
+and age verification data.
 """
 
 from __future__ import annotations
@@ -12,6 +13,32 @@ from django.contrib.auth.models import Permission
 
 if TYPE_CHECKING:
     from users.models import CustomUser
+
+
+def get_age_verification(user: "CustomUser") -> dict[str, Any] | None:
+    """Get user's age verification data for JWT claims.
+
+    Args:
+        user: The CustomUser instance.
+
+    Returns:
+        Dictionary with age, status, and verified_at, or None if no DOB.
+        Note: date_of_birth is NEVER included (privacy compliance FR-013).
+    """
+    if not hasattr(user, "profile"):
+        return None
+
+    profile = user.profile
+    if not profile.date_of_birth:
+        return None
+
+    return {
+        "age": profile.age,
+        "status": profile.age_verification_status,
+        "verified_at": (
+            profile.age_verified_at.isoformat() if profile.age_verified_at else None
+        ),
+    }
 
 
 def get_user_policies(user: "CustomUser") -> dict[str, Any]:
@@ -76,11 +103,18 @@ def build_token_claims(user: "CustomUser") -> dict[str, Any]:
         Dictionary of claims to embed in the token.
     """
     policies = get_user_policies(user)
+    age_verification = get_age_verification(user)
 
-    return {
+    claims = {
         "user_id": user.pk,
         "email": user.email,
         "is_staff": user.is_staff,
         "is_superuser": user.is_superuser,
         "policies": policies,
     }
+
+    # Only include age_verification if user has provided DOB
+    if age_verification is not None:
+        claims["age_verification"] = age_verification
+
+    return claims

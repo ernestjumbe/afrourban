@@ -11,7 +11,7 @@ from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from users.claims import build_token_claims, get_user_policies
+from users.claims import build_token_claims, get_age_verification, get_user_policies
 
 User = get_user_model()
 
@@ -147,12 +147,19 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 
         # Add user data to response
         policies = get_user_policies(self.user)
-        data["user"] = {
+        age_verification = get_age_verification(self.user)
+
+        user_data = {
             "id": self.user.pk,
             "email": self.user.email,
             "is_staff": self.user.is_staff,
             "policies": policies,
         }
+
+        if age_verification is not None:
+            user_data["age_verification"] = age_verification
+
+        data["user"] = user_data
 
         return data
 
@@ -216,6 +223,8 @@ class AdminProfileSerializer(serializers.Serializer):
     bio = serializers.CharField(allow_blank=True, read_only=True)
     avatar = serializers.SerializerMethodField()
     phone_number = serializers.CharField(allow_blank=True, read_only=True)
+    age_verification_status = serializers.CharField(read_only=True)
+    age_verified_at = serializers.DateTimeField(read_only=True, allow_null=True)
 
     def get_avatar(self, obj: Any) -> str | None:
         """Get avatar URL."""

@@ -1,8 +1,59 @@
 """Profile models for extended user data."""
 
+from datetime import date, timedelta
+
 from django.conf import settings
 from django.contrib.auth.models import Group
+from django.core.exceptions import ValidationError
 from django.db import models
+
+
+def validate_date_of_birth_not_future(value: date) -> None:
+    """Validate date of birth is not in the future.
+
+    Args:
+        value: Date to validate.
+
+    Raises:
+        ValidationError: If date is in the future.
+    """
+    if value > date.today():
+        raise ValidationError("Date of birth cannot be in the future.")
+
+
+def validate_date_of_birth_not_too_old(value: date) -> None:
+    """Validate date of birth is not more than 120 years ago.
+
+    Args:
+        value: Date to validate.
+
+    Raises:
+        ValidationError: If date is more than 120 years ago.
+    """
+    min_date = date.today() - timedelta(days=120 * 365)
+    if value < min_date:
+        raise ValidationError("Date of birth cannot be more than 120 years ago.")
+
+
+class AgeVerificationStatus(models.TextChoices):
+    """Age verification status choices.
+
+    Active states (implemented):
+        UNVERIFIED: Default state, no date of birth provided.
+        SELF_DECLARED: User has provided date of birth.
+
+    Reserved states (future document verification):
+        PENDING: Documents submitted, awaiting review.
+        VERIFIED: Documents approved, age verified.
+        FAILED: Documents rejected, verification failed.
+    """
+
+    UNVERIFIED = "unverified", "Unverified"
+    SELF_DECLARED = "self_declared", "Self Declared"
+    # Reserved for future document verification
+    PENDING = "pending", "Pending Verification"
+    VERIFIED = "verified", "Verified"
+    FAILED = "failed", "Verification Failed"
 
 
 class Profile(models.Model):
@@ -18,6 +69,8 @@ class Profile(models.Model):
         avatar: Profile picture (JPEG/PNG/WebP, max 5MB).
         phone_number: Contact number.
         date_of_birth: Birth date for age verification.
+        age_verification_status: Current verification state.
+        age_verified_at: Timestamp of last status change.
         preferences: JSON object for user settings.
         created_at: Profile creation timestamp.
         updated_at: Last modification timestamp.
@@ -53,7 +106,22 @@ class Profile(models.Model):
     date_of_birth = models.DateField(
         null=True,
         blank=True,
+        validators=[
+            validate_date_of_birth_not_future,
+            validate_date_of_birth_not_too_old,
+        ],
         help_text="Birth date",
+    )
+    age_verification_status = models.CharField(
+        max_length=20,
+        choices=AgeVerificationStatus.choices,
+        default=AgeVerificationStatus.UNVERIFIED,
+        help_text="Current age verification state",
+    )
+    age_verified_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Timestamp of last verification status change",
     )
     preferences = models.JSONField(
         default=dict,
@@ -70,6 +138,34 @@ class Profile(models.Model):
     def __str__(self) -> str:
         """Return display name or user email."""
         return self.display_name or str(self.user)
+
+    @property
+    def age(self) -> int | None:
+        """Calculate current age from date_of_birth.
+
+        Returns:
+            Age in completed years, or None if date_of_birth not set.
+        """
+        if not self.date_of_birth:
+            return None
+        today = date.today()
+        age = today.year - self.date_of_birth.year
+        # Adjust if birthday hasn't occurred this year
+        if (today.month, today.day) < (
+            self.date_of_birth.month,
+            self.date_of_birth.day,
+        ):
+            age -= 1
+        return age
+
+    @property
+    def age_verified(self) -> bool:
+        """Check if age has been provided (at minimum self_declared).
+
+        Returns:
+            True if age verification status is not unverified.
+        """
+        return self.age_verification_status != AgeVerificationStatus.UNVERIFIED
 
 
 class Policy(models.Model):
