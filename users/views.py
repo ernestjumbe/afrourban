@@ -2,7 +2,7 @@
 
 from django.contrib.auth import get_user_model
 from rest_framework import status
-from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
+from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -31,15 +31,18 @@ from users.serializers import (
     PermissionsInputSerializer,
     PermissionsOutputSerializer,
     RegisterInputSerializer,
+    ResendVerificationEmailInputSerializer,
     RoleCreateInputSerializer,
     RoleDetailSerializer,
     RoleListSerializer,
-    RoleOutputSerializer,
     RoleUpdateInputSerializer,
     UserActivationOutputSerializer,
     UserOutputSerializer,
+    VerifyEmailInputSerializer,
 )
 from users.services import (
+    email_verification_resend,
+    email_verification_verify,
     role_create,
     role_delete,
     role_update,
@@ -82,6 +85,42 @@ class RegisterView(APIView):
 
         output_serializer = UserOutputSerializer(user)
         return Response(output_serializer.data, status=status.HTTP_201_CREATED)
+
+
+class VerifyEmailView(APIView):
+    """API view for email verification.
+
+    POST /api/auth/email-verification/verify/
+    Validates a verification token and marks the user's email as verified.
+    """
+
+    permission_classes = [AllowAny]
+
+    def post(self, request: Request) -> Response:
+        serializer = VerifyEmailInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        email_verification_verify(token=serializer.validated_data["token"])
+
+        return Response({"status": "ok"})
+
+
+class ResendVerificationEmailView(APIView):
+    """API view for resending a verification email.
+
+    POST /api/auth/email-verification/resend/
+    Always returns 200 OK to prevent user enumeration.
+    """
+
+    permission_classes = [AllowAny]
+
+    def post(self, request: Request) -> Response:
+        serializer = ResendVerificationEmailInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        email_verification_resend(email=serializer.validated_data["email"])
+
+        return Response({"status": "ok"})
 
 
 class CustomTokenObtainPairView(TokenObtainPairView):

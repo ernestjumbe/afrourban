@@ -44,15 +44,19 @@ def problem_details_exception_handler(
     # Extract detail from various error formats
     if isinstance(response.data, dict):
         if "detail" in response.data:
-            problem_detail["detail"] = response.data["detail"]
+            detail_value = response.data["detail"]
+            problem_detail["detail"] = str(detail_value)
+            if hasattr(detail_value, "code") and detail_value.code:
+                problem_detail["code"] = detail_value.code
         else:
             # Field validation errors
             problem_detail["detail"] = "Validation failed"
             problem_detail["errors"] = response.data
     elif isinstance(response.data, list):
-        problem_detail["detail"] = (
-            response.data[0] if response.data else "An error occurred"
-        )
+        first = response.data[0] if response.data else None
+        problem_detail["detail"] = str(first) if first else "An error occurred"
+        if first is not None and hasattr(first, "code") and first.code:
+            problem_detail["code"] = first.code
         if len(response.data) > 1:
             problem_detail["errors"] = response.data
     else:

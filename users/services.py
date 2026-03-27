@@ -5,17 +5,26 @@ Following HackSoftware Django Styleguide: services handle write operations.
 
 from __future__ import annotations
 
+import secrets
+from datetime import timedelta
 from typing import TYPE_CHECKING
 
 import structlog
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
+from django.core.mail import send_mail
 from django.db import transaction
+from django.template.loader import render_to_string
+from django.utils import timezone
+from rest_framework.exceptions import ValidationError
 
 from profiles.models import Profile
+from users.conf import app_settings
 
 if TYPE_CHECKING:
-    from users.models import CustomUser
+    from django.contrib.auth.models import Group
+
+    from users.models import CustomUser, EmailVerificationToken
 
 User = get_user_model()
 logger = structlog.get_logger(__name__)
@@ -31,7 +40,9 @@ def user_create(
     """Create a new user with an associated profile.
 
     This is the primary registration service. Creates both the
-    CustomUser and Profile in a single transaction.
+    CustomUser and Profile in a single transaction. If an unverified
+    account already exists for the given email, it is superseded
+    (deleted and replaced).
 
     Args:
         email: User's email address (used as login identifier).
@@ -42,8 +53,16 @@ def user_create(
         The created CustomUser instance with profile attached.
 
     Raises:
-        IntegrityError: If email already exists.
+        IntegrityError: If a *verified* email already exists.
     """
+    # Supersede any existing unverified account (CASCADE deletes token)
+    existing_unverified = User.objects.filter(
+        email__iexact=email, is_email_verified=False
+    )
+    if existing_unverified.exists():
+        logger.info("email_verification_superseded", email=email)
+        existing_unverified.delete()
+
     user = User.objects.create_user(
         email=email,
         password=password,
@@ -59,6 +78,10 @@ def user_create(
         user_id=user.id,
         email=user.email,
     )
+
+    # Create verification token and send email
+    token_obj = email_verification_token_create(user=user)
+    email_verification_send(user=user, token_obj=token_obj)
 
     return user
 
@@ -147,6 +170,146 @@ def user_update(
 
 
 # =============================================================================
+# Email Verification Services
+# =============================================================================
+
+
+def email_verification_token_create(
+    *,
+    user: "CustomUser",
+) -> "EmailVerificationToken":
+    """Create an email verification token for a user.
+
+    Generates a cryptographically secure token and persists it.
+
+    Args:
+        user: The user to create a token for.
+
+    Returns:
+        The created EmailVerificationToken instance.
+    """
+    from users.models import EmailVerificationToken
+
+    token_value = secrets.token_urlsafe(32)
+    expires_at = timezone.now() + timedelta(
+        days=app_settings.EMAIL_VERIFICATION_TOKEN_EXPIRY_DAYS,
+    )
+
+    return EmailVerificationToken.objects.create(
+        user=user,
+        token=token_value,
+        expires_at=expires_at,
+    )
+
+
+def email_verification_send(
+    *,
+    user: "CustomUser",
+    token_obj: "EmailVerificationToken",
+) -> None:
+    """Send a verification email to the user.
+
+    Renders both HTML and plain-text templates and dispatches
+    via Django's ``send_mail``.
+
+    Args:
+        user: The recipient user.
+        token_obj: The verification token to embed in the link.
+    """
+    verification_url = (
+        f"{app_settings.EMAIL_VERIFICATION_BASE_URL}"
+        f"/registration/email-verification?token={token_obj.token}"
+    )
+    site_name = app_settings.EMAIL_VERIFICATION_SITE_NAME
+    expiry_days = app_settings.EMAIL_VERIFICATION_TOKEN_EXPIRY_DAYS
+
+    context = {
+        "user": user,
+        "verification_url": verification_url,
+        "base_url": app_settings.EMAIL_VERIFICATION_BASE_URL,
+        "expiry_days": expiry_days,
+        "site_name": site_name,
+    }
+
+    text_body = render_to_string("users/emails/email_verification.txt", context)
+    html_body = render_to_string("users/emails/email_verification.html", context)
+
+    send_mail(
+        subject=f"Verify your email address \u2013 {site_name}",
+        message=text_body,
+        from_email=app_settings.EMAIL_VERIFICATION_FROM_EMAIL,
+        recipient_list=[user.email],
+        html_message=html_body,
+    )
+
+
+def email_verification_verify(*, token: str) -> None:
+    """Verify an email address using the supplied token.
+
+    On success the user's email is marked verified and the token
+    is deleted. Expired tokens are also deleted.
+
+    Args:
+        token: The opaque token string.
+
+    Raises:
+        ValidationError: With ``code="token_invalid"`` if the token
+            does not exist, or ``code="token_expired"`` if expired.
+    """
+    from users.selectors import email_verification_token_get_by_token
+
+    token_obj = email_verification_token_get_by_token(token=token)
+
+    if token_obj is None:
+        raise ValidationError(
+            detail="Verification token is invalid.",
+            code="token_invalid",
+        )
+
+    if timezone.now() >= token_obj.expires_at:
+        token_obj.delete()
+        logger.info(
+            "email_verification_token_expired",
+            user_id=token_obj.user.id,
+        )
+        raise ValidationError(
+            detail="Verification token has expired.",
+            code="token_expired",
+        )
+
+    with transaction.atomic():
+        token_obj.user.is_email_verified = True
+        token_obj.user.save(update_fields=["is_email_verified"])
+        token_obj.delete()
+
+    logger.info("email_verified", user_id=token_obj.user.id)
+
+
+def email_verification_resend(*, email: str) -> None:
+    """Resend a verification email for the given address.
+
+    Enumeration-safe: always returns without raising, regardless
+    of whether the email exists or is already verified.
+
+    Args:
+        email: The email address to resend verification for.
+    """
+    from users.models import EmailVerificationToken
+
+    user = User.objects.filter(email__iexact=email).first()
+
+    if user is None or user.is_email_verified:
+        return
+
+    EmailVerificationToken.objects.filter(user=user).delete()
+
+    token_obj = email_verification_token_create(user=user)
+    email_verification_send(user=user, token_obj=token_obj)
+
+    logger.info("email_verification_resend_sent", user_id=user.id, email=email)
+
+
+# =============================================================================
 # Role Services (Phase 7: User Story 5)
 # =============================================================================
 
@@ -197,7 +360,6 @@ def role_update(
     Returns:
         The updated Group instance.
     """
-    from django.contrib.auth.models import Group
 
     if name is not None:
         role.name = name

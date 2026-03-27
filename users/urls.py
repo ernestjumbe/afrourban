@@ -23,8 +23,10 @@ from users.views import (
     PasswordResetConfirmView,
     PasswordResetRequestView,
     RegisterView,
+    ResendVerificationEmailView,
     TokenRefreshView,
     TokenVerifyView,
+    VerifyEmailView,
 )
 
 app_name = "users"
@@ -36,6 +38,17 @@ auth_urlpatterns: list = [
     path("token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
     path("token/verify/", TokenVerifyView.as_view(), name="token_verify"),
     path("logout/", LogoutView.as_view(), name="logout"),
+    # Email verification
+    path(
+        "email-verification/verify/",
+        VerifyEmailView.as_view(),
+        name="email_verification_verify",
+    ),
+    path(
+        "email-verification/resend/",
+        ResendVerificationEmailView.as_view(),
+        name="email_verification_resend",
+    ),
     # Password management
     path(
         "password/reset/",

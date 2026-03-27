@@ -12,7 +12,7 @@ from django.contrib.auth.models import Permission
 from django.db.models import Q, QuerySet
 
 if TYPE_CHECKING:
-    from users.models import CustomUser
+    from users.models import CustomUser, EmailVerificationToken
 
 User = get_user_model()
 
@@ -188,6 +188,32 @@ def permission_list() -> QuerySet[Permission]:
         QuerySet of Permission instances.
     """
     return Permission.objects.select_related("content_type").all()
+
+
+# =============================================================================
+# Email Verification Selectors
+# =============================================================================
+
+
+def email_verification_token_get_by_token(
+    *,
+    token: str,
+) -> "EmailVerificationToken | None":
+    """Look up an email verification token by its opaque value.
+
+    Args:
+        token: The token string to search for.
+
+    Returns:
+        The EmailVerificationToken with user prefetched, or None.
+    """
+    from users.models import EmailVerificationToken
+
+    return (
+        EmailVerificationToken.objects.select_related("user")
+        .filter(token=token)
+        .first()
+    )
 
 
 # =============================================================================

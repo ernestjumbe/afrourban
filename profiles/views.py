@@ -13,16 +13,24 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from profiles.models import Profile
+from django.utils import timezone
+
+from profiles.models import Policy, Profile
 from profiles.selectors import profile_get_by_user, profile_get_by_user_id
 from profiles.serializers import (
     AvatarOutputSerializer,
     AvatarUploadSerializer,
+    PolicyCheckOutputSerializer,
     ProfileInputSerializer,
     ProfileOutputSerializer,
     ProfilePublicOutputSerializer,
 )
-from profiles.services import avatar_delete, avatar_upload, profile_update
+from profiles.services import (
+    avatar_delete,
+    avatar_upload,
+    policy_evaluate,
+    profile_update,
+)
 
 
 class ProfileMeView(APIView):
@@ -149,3 +157,69 @@ class ProfilePublicView(APIView):
             profile, context={"request": request}
         )
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class PolicyCheckView(APIView):
+    """Check if the authenticated user passes a specific policy.
+
+    GET: Evaluate a policy against the current user.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    REASON_MESSAGES = {
+        "minimum_age_not_met": "You must be at least {min_age} years old to access this feature.",
+        "age_unknown": "Please provide your date of birth to access this feature.",
+    }
+
+    def get(self, request: Request, policy_id: int) -> Response:
+        """Check if the authenticated user passes the given policy.
+
+        Args:
+            request: HTTP request.
+            policy_id: The policy ID to evaluate.
+
+        Returns:
+            Policy check result with pass/fail and reason.
+        """
+        try:
+            policy = Policy.objects.get(pk=policy_id)
+        except Policy.DoesNotExist:
+            from rest_framework.exceptions import NotFound
+
+            raise NotFound("Policy not found.")
+
+        profile = profile_get_by_user(user=request.user)
+        passed, reason = policy_evaluate(policy=policy, profile=profile)
+
+        result = {
+            "policy_id": policy.pk,
+            "policy_name": policy.name,
+            "passed": passed,
+            "reason": reason,
+            "message": self._get_message(reason, policy),
+            "evaluated_at": timezone.now(),
+        }
+
+        serializer = PolicyCheckOutputSerializer(result)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def _get_message(self, reason: str | None, policy: Policy) -> str | None:
+        """Get human-readable message for a failure reason.
+
+        Args:
+            reason: The failure reason code.
+            policy: The policy being evaluated.
+
+        Returns:
+            Human-readable message or None if passed.
+        """
+        if reason is None:
+            return None
+
+        template = self.REASON_MESSAGES.get(reason)
+        if template is None:
+            return reason
+
+        min_age = (policy.conditions or {}).get("minimum_age", 0)
+        return template.format(min_age=min_age)

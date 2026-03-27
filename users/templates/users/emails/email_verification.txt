@@ -1,0 +1,15 @@
+Verify your email address
+=========================
+
+Hi {{ user.email }},
+
+Thanks for signing up with {{ site_name }}! Please visit the link below to
+verify your email address and activate your account:
+
+{{ verification_url }}
+
+This link will expire in {{ expiry_days }} days. If you did not create an
+account, you can safely ignore this email.
+
+--
+{{ site_name }}

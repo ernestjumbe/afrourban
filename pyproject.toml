@@ -22,6 +22,7 @@ werkzeug = "^3.1.3"
 mypy = "^1.15.0"
 factory-boy = "^3.3.3"
 pytest-django = "^4.12.0"
+ruff = "^0.15.8"
 
 
 [tool.poetry.group.prd.dependencies]
@@ -35,3 +36,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.mypy]
 disable_error_code = ["import-untyped"]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "afrourban.settings.test"
+pythonpath = ["."]

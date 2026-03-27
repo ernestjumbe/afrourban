@@ -14,17 +14,23 @@ class ProfileAdmin(admin.ModelAdmin):
         "display_name",
         "phone_number",
         "date_of_birth",
+        "age_verification_status",
+        "age_verified_at",
         "created_at",
     )
-    list_filter = ("created_at", "updated_at")
+    list_filter = ("age_verification_status", "created_at", "updated_at")
     search_fields = ("user__email", "display_name", "phone_number")
     ordering = ("-created_at",)
-    readonly_fields = ("user", "created_at", "updated_at")
+    readonly_fields = ("user", "age_verified_at", "created_at", "updated_at")
 
     fieldsets = (
         (None, {"fields": ("user", "display_name", "bio")}),
         ("Contact", {"fields": ("phone_number",)}),
         ("Personal", {"fields": ("date_of_birth", "avatar")}),
+        (
+            "Age Verification",
+            {"fields": ("age_verification_status", "age_verified_at")},
+        ),
         ("Settings", {"fields": ("preferences",)}),
         ("Timestamps", {"fields": ("created_at", "updated_at")}),
     )
