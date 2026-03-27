@@ -16,16 +16,25 @@ MIDDLEWARE += [
 ALLOWED_HOSTS = ["*"]
 
 
-DATABASES = {
-    "default": {
-        "ENGINE": SQL_ENGINE,
-        "NAME": SQL_DATABASE,
-        "USER": SQL_USER,
-        "PASSWORD": SQL_PASSWORD,
-        "HOST": SQL_HOST,
-        "PORT": int(SQL_PORT),
+# Database configuration - supports both SQLite and PostgreSQL
+if SQL_ENGINE == "django.db.backends.sqlite3":
+    DATABASES = {
+        "default": {
+            "ENGINE": SQL_ENGINE,
+            "NAME": BASE_DIR / SQL_DATABASE,
+        }
     }
-}
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": SQL_ENGINE,
+            "NAME": SQL_DATABASE,
+            "USER": SQL_USER,
+            "PASSWORD": SQL_PASSWORD,
+            "HOST": SQL_HOST,
+            "PORT": int(SQL_PORT) if SQL_PORT else 5432,
+        }
+    }
 
 STATIC_ROOT = os.path.join(BASE_DIR, "static")
 MEDIA_ROOT = os.path.join(BASE_DIR, "media")

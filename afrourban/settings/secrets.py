@@ -1,5 +1,15 @@
-import os
 import base64
+import os
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+# Load environment variables from .env file for local development
+# The .env file should be in the project root (same level as manage.py)
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
+env_file = BASE_DIR / ".env"
+if env_file.exists():
+    load_dotenv(env_file)
 
 # SECURITY WARNING: keep the secret key used in production secret!
 # SECRET_KEY = "django-insecure-9s@(x)g465r$)yt^1+0b^vf2ksz_u3ez05+a!lk1qe&95+vqk3"
