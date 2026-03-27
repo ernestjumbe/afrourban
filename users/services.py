@@ -5,13 +5,16 @@ Following HackSoftware Django Styleguide: services handle write operations.
 
 from __future__ import annotations
 
+import json
 import secrets
+import uuid
 from datetime import timedelta
 from typing import TYPE_CHECKING
 
 import structlog
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
+from django.core.cache import cache
 from django.core.mail import send_mail
 from django.db import transaction
 from django.template.loader import render_to_string
@@ -24,7 +27,7 @@ from users.conf import app_settings
 if TYPE_CHECKING:
     from django.contrib.auth.models import Group
 
-    from users.models import CustomUser, EmailVerificationToken
+    from users.models import CustomUser, EmailVerificationToken, WebAuthnCredential
 
 User = get_user_model()
 logger = structlog.get_logger(__name__)
@@ -528,3 +531,647 @@ def password_change(
     )
 
     return user
+
+
+# =============================================================================
+# WebAuthn / Passkey Services
+# =============================================================================
+
+CHALLENGE_CACHE_PREFIX = "webauthn_challenge"
+
+
+def _challenge_cache_key(challenge_id: str) -> str:
+    return f"{CHALLENGE_CACHE_PREFIX}:{challenge_id}"
+
+
+def store_challenge(
+    *,
+    challenge: bytes,
+    ceremony: str,
+    email: str | None = None,
+    display_name: str = "",
+    webauthn_user_id: bytes | None = None,
+) -> str:
+    """Store a WebAuthn challenge in the cache.
+
+    Args:
+        challenge: The raw challenge bytes.
+        ceremony: Either "registration" or "authentication".
+        email: Email associated with this challenge (registration only).
+        display_name: Display name for registration.
+        webauthn_user_id: The random user handle bytes (registration only).
+
+    Returns:
+        A UUID challenge_id used to retrieve the challenge later.
+    """
+    import base64
+
+    challenge_id = str(uuid.uuid4())
+    payload = {
+        "challenge": base64.b64encode(challenge).decode("ascii"),
+        "ceremony": ceremony,
+    }
+    if email is not None:
+        payload["email"] = email
+    if display_name:
+        payload["display_name"] = display_name
+    if webauthn_user_id is not None:
+        payload["webauthn_user_id"] = base64.b64encode(webauthn_user_id).decode("ascii")
+
+    cache.set(
+        _challenge_cache_key(challenge_id),
+        json.dumps(payload),
+        timeout=app_settings.WEBAUTHN_CHALLENGE_TIMEOUT_SECONDS,
+    )
+    return challenge_id
+
+
+def retrieve_and_delete_challenge(*, challenge_id: str) -> dict:
+    """Retrieve and atomically delete a WebAuthn challenge from the cache.
+
+    Args:
+        challenge_id: The UUID returned by store_challenge.
+
+    Returns:
+        The challenge payload dict with decoded bytes.
+
+    Raises:
+        ValidationError: If challenge is not found or expired.
+    """
+    import base64
+
+    key = _challenge_cache_key(challenge_id)
+    raw = cache.get(key)
+    if raw is None:
+        raise ValidationError(
+            detail="Challenge not found or has expired.",
+            code="challenge_invalid",
+        )
+    cache.delete(key)
+
+    payload = json.loads(raw)
+    payload["challenge"] = base64.b64decode(payload["challenge"])
+    if "webauthn_user_id" in payload:
+        payload["webauthn_user_id"] = base64.b64decode(payload["webauthn_user_id"])
+    return payload
+
+
+def passkey_register_options(
+    *,
+    email: str,
+    display_name: str = "",
+) -> dict:
+    """Generate WebAuthn registration options for a new passkey user.
+
+    Validates the email is not taken by a verified account, generates
+    registration options via py_webauthn, stores the challenge, and
+    returns the options JSON + challenge_id.
+
+    Args:
+        email: The email for the new account.
+        display_name: Optional display name.
+
+    Returns:
+        Dict with "challenge_id" (str) and "options" (JSON string).
+
+    Raises:
+        ValidationError: If email belongs to a verified account.
+    """
+    from webauthn import generate_registration_options, options_to_json
+    from webauthn.helpers.structs import (
+        AuthenticatorSelectionCriteria,
+        PublicKeyCredentialDescriptor,
+        ResidentKeyRequirement,
+        UserVerificationRequirement,
+    )
+
+    email = email.lower()
+
+    # Check for existing verified account
+    if User.objects.filter(email__iexact=email, is_email_verified=True).exists():
+        raise ValidationError(
+            detail="This email is already associated with a verified account.",
+            code="email_already_verified",
+        )
+
+    # Collect existing credential IDs for exclude list (from unverified accounts)
+    exclude_credentials: list[PublicKeyCredentialDescriptor] = []
+    existing_user = User.objects.filter(email__iexact=email).first()
+    if existing_user:
+        from users.models import WebAuthnCredential
+
+        for cred in WebAuthnCredential.objects.filter(user=existing_user):
+            exclude_credentials.append(
+                PublicKeyCredentialDescriptor(id=bytes(cred.credential_id))
+            )
+
+    webauthn_user_id = secrets.token_bytes(64)
+
+    options = generate_registration_options(
+        rp_id=app_settings.WEBAUTHN_RP_ID,
+        rp_name=app_settings.WEBAUTHN_RP_NAME,
+        user_name=email,
+        user_id=webauthn_user_id,
+        user_display_name=display_name or email,
+        timeout=app_settings.WEBAUTHN_CHALLENGE_TIMEOUT_SECONDS * 1000,
+        authenticator_selection=AuthenticatorSelectionCriteria(
+            resident_key=ResidentKeyRequirement.REQUIRED,
+            user_verification=UserVerificationRequirement.PREFERRED,
+        ),
+        exclude_credentials=exclude_credentials or None,
+    )
+
+    challenge_id = store_challenge(
+        challenge=options.challenge,
+        ceremony="registration",
+        email=email,
+        display_name=display_name,
+        webauthn_user_id=webauthn_user_id,
+    )
+
+    options_json = options_to_json(options)
+
+    logger.info("passkey_register_options_generated", email=email)
+
+    return {
+        "challenge_id": challenge_id,
+        "options": options_json,
+    }
+
+
+@transaction.atomic
+def passkey_register_complete(
+    *,
+    challenge_id: str,
+    credential: dict,
+) -> "CustomUser":
+    """Complete passkey registration: verify attestation, create user + credential.
+
+    Args:
+        challenge_id: The challenge_id from the options step.
+        credential: The WebAuthn attestation response from the client.
+
+    Returns:
+        The created CustomUser instance.
+
+    Raises:
+        ValidationError: If challenge is invalid/expired, credential verification
+            fails, or email is already verified.
+    """
+    from webauthn import verify_registration_response
+
+    challenge_data = retrieve_and_delete_challenge(challenge_id=challenge_id)
+
+    if challenge_data.get("ceremony") != "registration":
+        raise ValidationError(
+            detail="Invalid challenge type.",
+            code="challenge_invalid",
+        )
+
+    email = challenge_data["email"]
+    display_name = challenge_data.get("display_name", "")
+    webauthn_user_id = challenge_data["webauthn_user_id"]
+
+    # Re-check email not verified (race condition guard)
+    if User.objects.filter(email__iexact=email, is_email_verified=True).exists():
+        raise ValidationError(
+            detail="This email is already associated with a verified account.",
+            code="email_already_verified",
+        )
+
+    # Verify the registration response
+    try:
+        verified = verify_registration_response(
+            credential=credential,
+            expected_challenge=challenge_data["challenge"],
+            expected_rp_id=app_settings.WEBAUTHN_RP_ID,
+            expected_origin=app_settings.WEBAUTHN_ORIGIN,
+        )
+    except Exception as e:
+        logger.warning("passkey_register_verification_failed", error=str(e))
+        raise ValidationError(
+            detail="Passkey registration verification failed.",
+            code="validation_error",
+        ) from e
+
+    # Supersede any existing unverified account
+    existing_unverified = User.objects.filter(
+        email__iexact=email, is_email_verified=False
+    )
+    if existing_unverified.exists():
+        logger.info("passkey_register_superseded_unverified", email=email)
+        existing_unverified.delete()
+
+    # Create user with no password (passkey-only)
+    user = User.objects.create_user(email=email, password=None)
+
+    Profile.objects.create(user=user, display_name=display_name)
+
+    # Store the WebAuthn credential
+    from users.models import WebAuthnCredential
+
+    WebAuthnCredential.objects.create(
+        user=user,
+        credential_id=verified.credential_id,
+        public_key=verified.credential_public_key,
+        sign_count=verified.sign_count,
+        webauthn_user_id=webauthn_user_id,
+    )
+
+    # Trigger email verification (same as password registration)
+    token_obj = email_verification_token_create(user=user)
+    email_verification_send(user=user, token_obj=token_obj)
+
+    logger.info(
+        "passkey_register_complete",
+        user_id=user.id,
+        email=user.email,
+    )
+
+    return user
+
+
+def passkey_authenticate_options() -> dict:
+    """Generate WebAuthn authentication options for discoverable credentials.
+
+    No user identification is required — the authenticator presents a
+    discoverable credential.
+
+    Returns:
+        Dict with "challenge_id" (str) and "options" (JSON string).
+    """
+    from webauthn import generate_authentication_options, options_to_json
+    from webauthn.helpers.structs import UserVerificationRequirement
+
+    options = generate_authentication_options(
+        rp_id=app_settings.WEBAUTHN_RP_ID,
+        timeout=app_settings.WEBAUTHN_CHALLENGE_TIMEOUT_SECONDS * 1000,
+        allow_credentials=[],
+        user_verification=UserVerificationRequirement.PREFERRED,
+    )
+
+    challenge_id = store_challenge(
+        challenge=options.challenge,
+        ceremony="authentication",
+    )
+
+    options_json = options_to_json(options)
+
+    logger.info("passkey_authenticate_options_generated")
+
+    return {
+        "challenge_id": challenge_id,
+        "options": options_json,
+    }
+
+
+@transaction.atomic
+def passkey_authenticate_complete(
+    *,
+    challenge_id: str,
+    credential: dict,
+) -> dict:
+    """Complete passkey authentication: verify assertion and issue JWT tokens.
+
+    Args:
+        challenge_id: The challenge_id from the options step.
+        credential: The WebAuthn assertion response from the client.
+
+    Returns:
+        Dict with "access" and "refresh" JWT token strings.
+
+    Raises:
+        ValidationError: If challenge is invalid/expired, credential not found,
+            credential disabled, sign count violation, or email not verified.
+    """
+    from webauthn import verify_authentication_response
+
+    from users.selectors import passkey_credential_get_by_credential_id
+    from users.serializers import CustomTokenObtainPairSerializer
+
+    challenge_data = retrieve_and_delete_challenge(challenge_id=challenge_id)
+
+    if challenge_data.get("ceremony") != "authentication":
+        raise ValidationError(
+            detail="Invalid challenge type.",
+            code="challenge_invalid",
+        )
+
+    # Look up credential by credential_id from the assertion response
+    import base64
+
+    raw_id = credential.get("rawId") or credential.get("id", "")
+    try:
+        credential_id_bytes = base64.urlsafe_b64decode(raw_id + "==")
+    except Exception:
+        raise ValidationError(
+            detail="Invalid credential format.",
+            code="validation_error",
+        )
+
+    webauthn_credential = passkey_credential_get_by_credential_id(
+        credential_id=credential_id_bytes,
+    )
+
+    if webauthn_credential is None:
+        raise ValidationError(
+            detail="Credential not registered.",
+            code="credential_not_found",
+        )
+
+    if not webauthn_credential.is_enabled:
+        logger.warning(
+            "passkey_authenticate_credential_disabled",
+            credential_id=webauthn_credential.pk,
+            user_id=webauthn_credential.user_id,
+        )
+        raise ValidationError(
+            detail="This credential has been disabled.",
+            code="credential_disabled",
+        )
+
+    user = webauthn_credential.user
+
+    if not user.is_email_verified:
+        logger.info(
+            "passkey_authenticate_email_not_verified",
+            user_id=user.pk,
+            email=user.email,
+        )
+        raise ValidationError(
+            detail="Email address has not been verified.",
+            code="email_not_verified",
+        )
+
+    # Verify the authentication response
+    try:
+        verified = verify_authentication_response(
+            credential=credential,
+            expected_challenge=challenge_data["challenge"],
+            expected_rp_id=app_settings.WEBAUTHN_RP_ID,
+            expected_origin=app_settings.WEBAUTHN_ORIGIN,
+            credential_public_key=bytes(webauthn_credential.public_key),
+            credential_current_sign_count=webauthn_credential.sign_count,
+        )
+    except Exception as e:
+        # Sign count regression indicates possible credential cloning
+        error_msg = str(e).lower()
+        if "sign count" in error_msg or "counter" in error_msg:
+            webauthn_credential.is_enabled = False
+            webauthn_credential.save(update_fields=["is_enabled"])
+            logger.warning(
+                "passkey_credential_cloning_detected",
+                credential_id=webauthn_credential.pk,
+                user_id=user.pk,
+                stored_sign_count=webauthn_credential.sign_count,
+            )
+            raise ValidationError(
+                detail="Sign count violation — credential has been disabled.",
+                code="credential_cloned",
+            ) from e
+
+        logger.warning("passkey_authenticate_verification_failed", error=str(e))
+        raise ValidationError(
+            detail="Passkey authentication verification failed.",
+            code="validation_error",
+        ) from e
+
+    # Update the sign count
+    webauthn_credential.sign_count = verified.new_sign_count
+    webauthn_credential.save(update_fields=["sign_count"])
+
+    # Issue JWT tokens
+    token = CustomTokenObtainPairSerializer.get_token(user)
+
+    logger.info(
+        "passkey_authenticate_complete",
+        user_id=user.pk,
+        email=user.email,
+        credential_id=webauthn_credential.pk,
+    )
+
+    return {
+        "access": str(token.access_token),
+        "refresh": str(token),
+    }
+
+
+def passkey_add_options(
+    *,
+    user: "CustomUser",
+    device_label: str = "",
+) -> dict:
+    """Generate WebAuthn registration options to add a passkey to an existing account.
+
+    Args:
+        user: The authenticated user.
+        device_label: Optional label for the new passkey.
+
+    Returns:
+        Dict with "challenge_id" (str) and "options" (JSON string).
+
+    Raises:
+        ValidationError: If email not verified or max credentials reached.
+    """
+    from webauthn import generate_registration_options, options_to_json
+    from webauthn.helpers.structs import (
+        AuthenticatorSelectionCriteria,
+        PublicKeyCredentialDescriptor,
+        ResidentKeyRequirement,
+        UserVerificationRequirement,
+    )
+
+    from users.models import WebAuthnCredential
+
+    if not user.is_email_verified:
+        raise ValidationError(
+            detail="Email address has not been verified.",
+            code="email_not_verified",
+        )
+
+    existing_credentials = WebAuthnCredential.objects.filter(user=user)
+    if existing_credentials.count() >= app_settings.WEBAUTHN_MAX_CREDENTIALS_PER_USER:
+        raise ValidationError(
+            detail="Maximum number of passkeys reached.",
+            code="max_credentials_reached",
+        )
+
+    # Build exclude list from existing credentials
+    exclude_credentials = [
+        PublicKeyCredentialDescriptor(id=bytes(cred.credential_id))
+        for cred in existing_credentials
+    ]
+
+    # Reuse the webauthn_user_id from the user's first credential, or generate new
+    first_cred = existing_credentials.first()
+    if first_cred:
+        webauthn_user_id = bytes(first_cred.webauthn_user_id)
+    else:
+        webauthn_user_id = secrets.token_bytes(64)
+
+    options = generate_registration_options(
+        rp_id=app_settings.WEBAUTHN_RP_ID,
+        rp_name=app_settings.WEBAUTHN_RP_NAME,
+        user_name=user.email,
+        user_id=webauthn_user_id,
+        user_display_name=device_label or user.email,
+        timeout=app_settings.WEBAUTHN_CHALLENGE_TIMEOUT_SECONDS * 1000,
+        authenticator_selection=AuthenticatorSelectionCriteria(
+            resident_key=ResidentKeyRequirement.REQUIRED,
+            user_verification=UserVerificationRequirement.PREFERRED,
+        ),
+        exclude_credentials=exclude_credentials or None,
+    )
+
+    challenge_id = store_challenge(
+        challenge=options.challenge,
+        ceremony="add",
+        email=user.email,
+        display_name=device_label,
+        webauthn_user_id=webauthn_user_id,
+    )
+
+    options_json = options_to_json(options)
+
+    logger.info("passkey_add_options_generated", user_id=user.pk)
+
+    return {
+        "challenge_id": challenge_id,
+        "options": options_json,
+    }
+
+
+@transaction.atomic
+def passkey_add_complete(
+    *,
+    user: "CustomUser",
+    challenge_id: str,
+    credential: dict,
+) -> "WebAuthnCredential":
+    """Complete adding a passkey to an existing account.
+
+    Args:
+        user: The authenticated user.
+        challenge_id: The challenge_id from the options step.
+        credential: The WebAuthn attestation response from the client.
+        device_label: Optional label for the new passkey.
+
+    Returns:
+        The created WebAuthnCredential instance.
+
+    Raises:
+        ValidationError: If challenge is invalid/expired, credential verification
+            fails, email not verified, or max credentials reached.
+    """
+    from webauthn import verify_registration_response
+
+    from users.models import WebAuthnCredential
+
+    if not user.is_email_verified:
+        raise ValidationError(
+            detail="Email address has not been verified.",
+            code="email_not_verified",
+        )
+
+    if (
+        WebAuthnCredential.objects.filter(user=user).count()
+        >= app_settings.WEBAUTHN_MAX_CREDENTIALS_PER_USER
+    ):
+        raise ValidationError(
+            detail="Maximum number of passkeys reached.",
+            code="max_credentials_reached",
+        )
+
+    challenge_data = retrieve_and_delete_challenge(challenge_id=challenge_id)
+
+    if challenge_data.get("ceremony") != "add":
+        raise ValidationError(
+            detail="Invalid challenge type.",
+            code="challenge_invalid",
+        )
+
+    try:
+        verified = verify_registration_response(
+            credential=credential,
+            expected_challenge=challenge_data["challenge"],
+            expected_rp_id=app_settings.WEBAUTHN_RP_ID,
+            expected_origin=app_settings.WEBAUTHN_ORIGIN,
+        )
+    except Exception as e:
+        logger.warning("passkey_add_verification_failed", error=str(e), user_id=user.pk)
+        raise ValidationError(
+            detail="Passkey verification failed.",
+            code="validation_error",
+        ) from e
+
+    device_label = challenge_data.get("display_name", "")
+
+    webauthn_credential = WebAuthnCredential.objects.create(
+        user=user,
+        credential_id=verified.credential_id,
+        public_key=verified.credential_public_key,
+        sign_count=verified.sign_count,
+        webauthn_user_id=challenge_data["webauthn_user_id"],
+        device_label=device_label,
+    )
+
+    logger.info(
+        "passkey_add_complete",
+        user_id=user.pk,
+        credential_id=webauthn_credential.pk,
+        device_label=device_label,
+    )
+
+    return webauthn_credential
+
+
+# =============================================================================
+# User Story 4: Passkey Management (List / Remove)
+# =============================================================================
+
+
+def passkey_credential_remove(
+    *,
+    user: "CustomUser",
+    credential_id: int,
+) -> None:
+    """Remove a passkey credential from a user's account.
+
+    Verifies the credential belongs to the user and prevents removal if it is
+    the user's last authentication method (no password and only one passkey).
+
+    Args:
+        user: The authenticated user.
+        credential_id: The database PK of the credential to remove.
+
+    Raises:
+        ValidationError: If credential not found, doesn't belong to user,
+            or is the last authentication method.
+    """
+    from users.models import WebAuthnCredential
+
+    credential = WebAuthnCredential.objects.filter(pk=credential_id, user=user).first()
+
+    if credential is None:
+        raise ValidationError(
+            detail="Credential not found.",
+            code="not_found",
+        )
+
+    has_password = user.has_usable_password()
+    passkey_count = WebAuthnCredential.objects.filter(user=user).count()
+
+    if not has_password and passkey_count <= 1:
+        raise ValidationError(
+            detail="Cannot remove last passkey when no password is set.",
+            code="last_auth_method",
+        )
+
+    credential_pk = credential.pk
+    credential.delete()
+
+    logger.info(
+        "passkey_credential_removed",
+        user_id=user.pk,
+        credential_id=credential_pk,
+    )

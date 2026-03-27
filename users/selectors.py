@@ -12,7 +12,7 @@ from django.contrib.auth.models import Permission
 from django.db.models import Q, QuerySet
 
 if TYPE_CHECKING:
-    from users.models import CustomUser, EmailVerificationToken
+    from users.models import CustomUser, EmailVerificationToken, WebAuthnCredential
 
 User = get_user_model()
 
@@ -297,3 +297,46 @@ def role_get_by_id(*, role_id: int) -> dict[str, Any]:
         "policies": policies,
         "user_count": role.user_count,
     }
+
+
+# =============================================================================
+# WebAuthn / Passkey Selectors
+# =============================================================================
+
+
+def passkey_credential_get_by_credential_id(
+    *,
+    credential_id: bytes,
+) -> "WebAuthnCredential | None":
+    """Look up an enabled WebAuthnCredential by its raw credential_id bytes.
+
+    Args:
+        credential_id: The raw credential ID bytes from the authenticator.
+
+    Returns:
+        The WebAuthnCredential with user prefetched, or None.
+    """
+    from users.models import WebAuthnCredential
+
+    return (
+        WebAuthnCredential.objects.select_related("user")
+        .filter(credential_id=credential_id)
+        .first()
+    )
+
+
+def passkey_credentials_list(
+    *,
+    user: "CustomUser",
+) -> QuerySet["WebAuthnCredential"]:
+    """Return queryset of WebAuthnCredentials for a user ordered by created_at.
+
+    Args:
+        user: The user whose credentials to list.
+
+    Returns:
+        QuerySet of WebAuthnCredential ordered by created_at ascending.
+    """
+    from users.models import WebAuthnCredential
+
+    return WebAuthnCredential.objects.filter(user=user).order_by("created_at")

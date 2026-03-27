@@ -49,6 +49,13 @@ INTERNAL_IPS = [
 
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 
+# WebAuthn / Passkey settings
+USERS_WEBAUTHN_RP_ID = "localhost"
+USERS_WEBAUTHN_RP_NAME = "Afrourban"
+USERS_WEBAUTHN_ORIGIN = "http://localhost:8000"
+USERS_WEBAUTHN_CHALLENGE_TIMEOUT_SECONDS = 300  # 5 minutes
+USERS_WEBAUTHN_MAX_CREDENTIALS_PER_USER = 5
+
 HTML_MINIFY = False
 
 EMAIL_HOST = "email"

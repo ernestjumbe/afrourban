@@ -92,3 +92,57 @@ class EmailVerificationToken(models.Model):
 
     def __str__(self) -> str:
         return f"EmailVerificationToken(user={self.user_id})"
+
+
+class WebAuthnCredential(models.Model):
+    """A WebAuthn passkey credential registered by a user.
+
+    Stores the public key material and metadata needed to verify
+    authentication assertions. Each user may have up to 5 credentials
+    (enforced at the service layer).
+    """
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="webauthn_credentials",
+    )
+    credential_id = models.BinaryField(
+        max_length=1024,
+        unique=True,
+        help_text="WebAuthn credential identifier (opaque bytes from authenticator).",
+    )
+    public_key = models.BinaryField(
+        max_length=1024,
+        help_text="COSE-encoded public key for signature verification.",
+    )
+    sign_count = models.PositiveIntegerField(
+        default=0,
+        help_text="Signature counter for cloning detection.",
+    )
+    webauthn_user_id = models.BinaryField(
+        max_length=64,
+        help_text="Random user handle used during registration (NOT the DB PK).",
+    )
+    device_label = models.CharField(
+        max_length=100,
+        blank=True,
+        default="",
+        help_text="User-provided or auto-generated device label.",
+    )
+    is_enabled = models.BooleanField(
+        default=True,
+        help_text="False when disabled (e.g., cloning detected).",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "WebAuthn credential"
+        verbose_name_plural = "WebAuthn credentials"
+        indexes = [
+            models.Index(fields=["user", "is_enabled"]),
+        ]
+
+    def __str__(self) -> str:
+        label = self.device_label or "unnamed"
+        return f"WebAuthnCredential({label}, user={self.user_id})"

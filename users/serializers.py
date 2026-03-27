@@ -531,3 +531,138 @@ class PasswordChangeSerializer(serializers.Serializer):
                 {"new_password_confirm": "Passwords do not match."}
             )
         return attrs
+
+
+# =============================================================================
+# Passkey Serializers (US1: Registration)
+# =============================================================================
+
+
+class PasskeyRegisterOptionsInputSerializer(serializers.Serializer):
+    """Input serializer for passkey registration options."""
+
+    email = serializers.EmailField(
+        help_text="Email address for the new account",
+    )
+    display_name = serializers.CharField(
+        max_length=100,
+        required=False,
+        allow_blank=True,
+        default="",
+        help_text="Optional display name (max 100 chars)",
+    )
+
+
+class PasskeyRegisterOptionsOutputSerializer(serializers.Serializer):
+    """Output serializer for passkey registration options."""
+
+    challenge_id = serializers.CharField()
+    options = serializers.JSONField()
+
+
+class PasskeyRegisterCompleteInputSerializer(serializers.Serializer):
+    """Input serializer for passkey registration completion."""
+
+    challenge_id = serializers.UUIDField(
+        help_text="Challenge ID from options response",
+    )
+    credential = serializers.JSONField(
+        help_text="WebAuthn attestation response from navigator.credentials.create()",
+    )
+
+
+class PasskeyRegisterCompleteOutputSerializer(serializers.Serializer):
+    """Output serializer for passkey registration completion."""
+
+    id = serializers.IntegerField(read_only=True)
+    email = serializers.EmailField(read_only=True)
+    is_email_verified = serializers.BooleanField(read_only=True)
+    message = serializers.CharField(read_only=True)
+
+
+# =============================================================================
+# Passkey Serializers (US2: Authentication)
+# =============================================================================
+
+
+class PasskeyAuthenticateOptionsOutputSerializer(serializers.Serializer):
+    """Output serializer for passkey authentication options."""
+
+    challenge_id = serializers.CharField()
+    options = serializers.JSONField()
+
+
+class PasskeyAuthenticateCompleteInputSerializer(serializers.Serializer):
+    """Input serializer for passkey authentication completion."""
+
+    challenge_id = serializers.UUIDField(
+        help_text="Challenge ID from options response",
+    )
+    credential = serializers.JSONField(
+        help_text="WebAuthn assertion response from navigator.credentials.get()",
+    )
+
+
+class PasskeyAuthenticateCompleteOutputSerializer(serializers.Serializer):
+    """Output serializer for passkey authentication completion."""
+
+    access = serializers.CharField(read_only=True)
+    refresh = serializers.CharField(read_only=True)
+
+
+# =============================================================================
+# Passkey Serializers (US3: Add Passkey to Existing Account)
+# =============================================================================
+
+
+class PasskeyAddOptionsInputSerializer(serializers.Serializer):
+    """Input serializer for adding a passkey to an existing account."""
+
+    device_label = serializers.CharField(
+        max_length=100,
+        required=False,
+        allow_blank=True,
+        default="",
+        help_text="Optional label for the new passkey (max 100 chars)",
+    )
+
+
+class PasskeyAddOptionsOutputSerializer(serializers.Serializer):
+    """Output serializer for passkey add options."""
+
+    challenge_id = serializers.CharField()
+    options = serializers.JSONField()
+
+
+class PasskeyAddCompleteInputSerializer(serializers.Serializer):
+    """Input serializer for completing passkey addition."""
+
+    challenge_id = serializers.UUIDField(
+        help_text="Challenge ID from options response",
+    )
+    credential = serializers.JSONField(
+        help_text="WebAuthn attestation response from navigator.credentials.create()",
+    )
+
+
+class PasskeyAddCompleteOutputSerializer(serializers.Serializer):
+    """Output serializer for passkey addition completion."""
+
+    id = serializers.IntegerField(read_only=True)
+    device_label = serializers.CharField(read_only=True)
+    created_at = serializers.DateTimeField(read_only=True)
+    is_enabled = serializers.BooleanField(read_only=True)
+
+
+# =============================================================================
+# User Story 4: Passkey Management (List / Remove)
+# =============================================================================
+
+
+class PasskeyCredentialListOutputSerializer(serializers.Serializer):
+    """Output serializer for listing passkey credentials."""
+
+    id = serializers.IntegerField(read_only=True)
+    device_label = serializers.CharField(read_only=True)
+    created_at = serializers.DateTimeField(read_only=True)
+    is_enabled = serializers.BooleanField(read_only=True)
