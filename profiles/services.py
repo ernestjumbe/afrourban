@@ -204,7 +204,6 @@ def policy_evaluate(
 
     import pytz
 
-    from profiles.models import Policy
 
     if not policy.is_active:
         return True, None  # Inactive policies always pass

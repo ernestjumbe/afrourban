@@ -13,7 +13,7 @@ from rest_framework.request import Request
 from rest_framework.views import APIView
 
 if TYPE_CHECKING:
-    from users.models import CustomUser
+    pass
 
 
 class HasPermission(BasePermission):

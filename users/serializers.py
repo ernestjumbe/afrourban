@@ -4,16 +4,19 @@ from __future__ import annotations
 
 from typing import Any
 
+import structlog
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
+from rest_framework.exceptions import AuthenticationFailed
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from users.claims import build_token_claims, get_age_verification, get_user_policies
 
 User = get_user_model()
+logger = structlog.get_logger(__name__)
 
 
 class RegisterInputSerializer(serializers.Serializer):
@@ -46,9 +49,9 @@ class RegisterInputSerializer(serializers.Serializer):
     )
 
     def validate_email(self, value: str) -> str:
-        """Validate email is not already in use."""
+        """Validate email is not already in use by a verified account."""
         email = value.lower()
-        if User.objects.filter(email__iexact=email).exists():
+        if User.objects.filter(email__iexact=email, is_email_verified=True).exists():
             raise serializers.ValidationError("This email is already in use.")
         return email
 
@@ -67,6 +70,18 @@ class RegisterInputSerializer(serializers.Serializer):
                 {"password_confirm": "Passwords do not match."}
             )
         return attrs
+
+
+class VerifyEmailInputSerializer(serializers.Serializer):
+    """Input serializer for email verification."""
+
+    token = serializers.CharField()
+
+
+class ResendVerificationEmailInputSerializer(serializers.Serializer):
+    """Input serializer for resending a verification email."""
+
+    email = serializers.EmailField()
 
 
 class ProfileOutputSerializer(serializers.Serializer):
@@ -144,6 +159,17 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             Token data with user information.
         """
         data = super().validate(attrs)
+
+        if not self.user.is_email_verified:
+            logger.info(
+                "email_verification_blocked_login",
+                user_id=self.user.pk,
+                email=self.user.email,
+            )
+            raise AuthenticationFailed(
+                detail="Email address has not been verified.",
+                code="email_not_verified",
+            )
 
         # Add user data to response
         policies = get_user_policies(self.user)

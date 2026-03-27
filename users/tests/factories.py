@@ -1,7 +1,11 @@
 """Test factories for users app."""
 
+import secrets
+from datetime import timedelta
+
 import factory
 from django.contrib.auth import get_user_model
+from django.utils import timezone
 
 User = get_user_model()
 
@@ -27,3 +31,14 @@ class UserFactory(factory.django.DjangoModelFactory):
             obj.set_password(password)
             obj.save()
         return obj
+
+
+class EmailVerificationTokenFactory(factory.django.DjangoModelFactory):
+    """Factory for creating EmailVerificationToken instances in tests."""
+
+    class Meta:
+        model = "users.EmailVerificationToken"
+
+    user = factory.SubFactory(UserFactory)
+    token = factory.LazyFunction(lambda: secrets.token_urlsafe(32))
+    expires_at = factory.LazyFunction(lambda: timezone.now() + timedelta(days=7))

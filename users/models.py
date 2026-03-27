@@ -1,5 +1,6 @@
 """Custom user model with email-based authentication."""
 
+from django.conf import settings
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
 from django.db import models
 from django.utils import timezone
@@ -39,6 +40,11 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
         default=False,
         help_text="Designates whether the user can log into this admin site.",
     )
+    is_email_verified = models.BooleanField(
+        "email verified",
+        default=False,
+        help_text="Designates whether the user has verified their email address.",
+    )
     date_joined = models.DateTimeField("date joined", default=timezone.now)
 
     objects = CustomUserManager()
@@ -62,3 +68,27 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
         """Normalize the email address."""
         super().clean()
         self.email = self.__class__.objects.normalize_email(self.email)
+
+
+class EmailVerificationToken(models.Model):
+    """One-time token for verifying a user's email address.
+
+    Each user has at most one active token at a time (enforced by OneToOneField).
+    Tokens are deleted upon successful verification or expiry rejection.
+    """
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="email_verification_token",
+    )
+    token = models.CharField(max_length=64, unique=True, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+
+    class Meta:
+        verbose_name = "email verification token"
+        verbose_name_plural = "email verification tokens"
+
+    def __str__(self) -> str:
+        return f"EmailVerificationToken(user={self.user_id})"
