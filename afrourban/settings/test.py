@@ -23,3 +23,10 @@ EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
 PASSWORD_HASHERS = [
     "django.contrib.auth.hashers.MD5PasswordHasher",
 ]
+
+# WebAuthn / Passkey settings for test environment
+USERS_WEBAUTHN_RP_ID = "localhost"
+USERS_WEBAUTHN_RP_NAME = "Afrourban"
+USERS_WEBAUTHN_ORIGIN = "http://localhost:8000"
+USERS_WEBAUTHN_CHALLENGE_TIMEOUT_SECONDS = 300
+USERS_WEBAUTHN_MAX_CREDENTIALS_PER_USER = 5

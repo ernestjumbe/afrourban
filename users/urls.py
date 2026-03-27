@@ -19,6 +19,14 @@ from users.views import (
     AdminUserPermissionsView,
     CustomTokenObtainPairView,
     LogoutView,
+    PasskeyAddCompleteView,
+    PasskeyAddOptionsView,
+    PasskeyAuthenticateCompleteView,
+    PasskeyAuthenticateOptionsView,
+    PasskeyListView,
+    PasskeyRegisterCompleteView,
+    PasskeyRegisterOptionsView,
+    PasskeyRemoveView,
     PasswordChangeView,
     PasswordResetConfirmView,
     PasswordResetRequestView,
@@ -61,6 +69,50 @@ auth_urlpatterns: list = [
         name="password_reset_confirm",
     ),
     path("password/change/", PasswordChangeView.as_view(), name="password_change"),
+    # Passkey registration
+    path(
+        "passkey/register/options/",
+        PasskeyRegisterOptionsView.as_view(),
+        name="passkey_register_options",
+    ),
+    path(
+        "passkey/register/complete/",
+        PasskeyRegisterCompleteView.as_view(),
+        name="passkey_register_complete",
+    ),
+    # Passkey authentication
+    path(
+        "passkey/authenticate/options/",
+        PasskeyAuthenticateOptionsView.as_view(),
+        name="passkey_authenticate_options",
+    ),
+    path(
+        "passkey/authenticate/complete/",
+        PasskeyAuthenticateCompleteView.as_view(),
+        name="passkey_authenticate_complete",
+    ),
+    # Passkey add to existing account
+    path(
+        "passkey/add/options/",
+        PasskeyAddOptionsView.as_view(),
+        name="passkey_add_options",
+    ),
+    path(
+        "passkey/add/complete/",
+        PasskeyAddCompleteView.as_view(),
+        name="passkey_add_complete",
+    ),
+    # Passkey management
+    path(
+        "passkey/",
+        PasskeyListView.as_view(),
+        name="passkey_list",
+    ),
+    path(
+        "passkey/<int:credential_id>/",
+        PasskeyRemoveView.as_view(),
+        name="passkey_remove",
+    ),
 ]
 
 # Admin user management URLs (mounted at /api/admin/users/)

@@ -739,3 +739,243 @@ class PasswordChangeView(APIView):
             {"detail": "Password has been changed successfully."},
             status=status.HTTP_200_OK,
         )
+
+
+# =============================================================================
+# Passkey Views (US1: Registration)
+# =============================================================================
+
+
+class PasskeyRegisterOptionsView(APIView):
+    """API view for passkey registration options.
+
+    POST /api/auth/passkey/register/options/
+    Initiates the passkey registration ceremony.
+    """
+
+    permission_classes = [AllowAny]
+
+    def post(self, request: Request) -> Response:
+        from users.serializers import (
+            PasskeyRegisterOptionsInputSerializer,
+            PasskeyRegisterOptionsOutputSerializer,
+        )
+        from users.services import passkey_register_options
+
+        serializer = PasskeyRegisterOptionsInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        import json
+
+        result = passkey_register_options(
+            email=serializer.validated_data["email"],
+            display_name=serializer.validated_data.get("display_name", ""),
+        )
+
+        output = PasskeyRegisterOptionsOutputSerializer(
+            {
+                "challenge_id": result["challenge_id"],
+                "options": json.loads(result["options"]),
+            }
+        )
+        return Response(output.data, status=status.HTTP_200_OK)
+
+
+class PasskeyRegisterCompleteView(APIView):
+    """API view for passkey registration completion.
+
+    POST /api/auth/passkey/register/complete/
+    Completes registration, creates user, triggers email verification.
+    """
+
+    permission_classes = [AllowAny]
+
+    def post(self, request: Request) -> Response:
+        from users.serializers import (
+            PasskeyRegisterCompleteInputSerializer,
+            PasskeyRegisterCompleteOutputSerializer,
+        )
+        from users.services import passkey_register_complete
+
+        serializer = PasskeyRegisterCompleteInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        user = passkey_register_complete(
+            challenge_id=str(serializer.validated_data["challenge_id"]),
+            credential=serializer.validated_data["credential"],
+        )
+
+        output = PasskeyRegisterCompleteOutputSerializer(
+            {
+                "id": user.pk,
+                "email": user.email,
+                "is_email_verified": user.is_email_verified,
+                "message": "Account created. Please verify your email address.",
+            }
+        )
+        return Response(output.data, status=status.HTTP_201_CREATED)
+
+
+# =============================================================================
+# Passkey Views (US2: Authentication)
+# =============================================================================
+
+
+class PasskeyAuthenticateOptionsView(APIView):
+    """API view for passkey authentication options.
+
+    POST /api/auth/passkey/authenticate/options/
+    Initiates the passkey authentication ceremony (discoverable credentials).
+    """
+
+    permission_classes = [AllowAny]
+
+    def post(self, request: Request) -> Response:
+        import json
+
+        from users.serializers import PasskeyAuthenticateOptionsOutputSerializer
+        from users.services import passkey_authenticate_options
+
+        result = passkey_authenticate_options()
+
+        output = PasskeyAuthenticateOptionsOutputSerializer(
+            {
+                "challenge_id": result["challenge_id"],
+                "options": json.loads(result["options"]),
+            }
+        )
+        return Response(output.data, status=status.HTTP_200_OK)
+
+
+class PasskeyAuthenticateCompleteView(APIView):
+    """API view for passkey authentication completion.
+
+    POST /api/auth/passkey/authenticate/complete/
+    Verifies assertion and returns JWT tokens.
+    """
+
+    permission_classes = [AllowAny]
+
+    def post(self, request: Request) -> Response:
+        from users.serializers import (
+            PasskeyAuthenticateCompleteInputSerializer,
+            PasskeyAuthenticateCompleteOutputSerializer,
+        )
+        from users.services import passkey_authenticate_complete
+
+        serializer = PasskeyAuthenticateCompleteInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        tokens = passkey_authenticate_complete(
+            challenge_id=str(serializer.validated_data["challenge_id"]),
+            credential=serializer.validated_data["credential"],
+        )
+
+        output = PasskeyAuthenticateCompleteOutputSerializer(tokens)
+        return Response(output.data, status=status.HTTP_200_OK)
+
+
+# =============================================================================
+# Passkey Views (US3: Add Passkey to Existing Account)
+# =============================================================================
+
+
+class PasskeyAddOptionsView(APIView):
+    """API view for adding a passkey to an existing account.
+
+    POST /api/auth/passkey/add/options/
+    Initiates passkey addition for an authenticated user.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request: Request) -> Response:
+        import json
+
+        from users.serializers import (
+            PasskeyAddOptionsInputSerializer,
+            PasskeyAddOptionsOutputSerializer,
+        )
+        from users.services import passkey_add_options
+
+        serializer = PasskeyAddOptionsInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        result = passkey_add_options(
+            user=request.user,
+            device_label=serializer.validated_data.get("device_label", ""),
+        )
+
+        output = PasskeyAddOptionsOutputSerializer(
+            {
+                "challenge_id": result["challenge_id"],
+                "options": json.loads(result["options"]),
+            }
+        )
+        return Response(output.data, status=status.HTTP_200_OK)
+
+
+class PasskeyAddCompleteView(APIView):
+    """API view for completing passkey addition.
+
+    POST /api/auth/passkey/add/complete/
+    Completes passkey addition for an authenticated user.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request: Request) -> Response:
+        from users.serializers import (
+            PasskeyAddCompleteInputSerializer,
+            PasskeyAddCompleteOutputSerializer,
+        )
+        from users.services import passkey_add_complete
+
+        serializer = PasskeyAddCompleteInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        credential = passkey_add_complete(
+            user=request.user,
+            challenge_id=str(serializer.validated_data["challenge_id"]),
+            credential=serializer.validated_data["credential"],
+        )
+
+        output = PasskeyAddCompleteOutputSerializer(credential)
+        return Response(output.data, status=status.HTTP_201_CREATED)
+
+
+class PasskeyListView(APIView):
+    """API view for listing a user's passkey credentials.
+
+    GET /api/auth/passkey/
+    Returns the authenticated user's registered passkeys.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request: Request) -> Response:
+        from users.selectors import passkey_credentials_list
+        from users.serializers import PasskeyCredentialListOutputSerializer
+
+        credentials = passkey_credentials_list(user=request.user)
+        serializer = PasskeyCredentialListOutputSerializer(credentials, many=True)
+        return Response(
+            {"results": serializer.data, "count": len(serializer.data)},
+            status=status.HTTP_200_OK,
+        )
+
+
+class PasskeyRemoveView(APIView):
+    """API view for removing a passkey credential.
+
+    DELETE /api/auth/passkey/<credential_id>/
+    Removes a passkey credential from the authenticated user's account.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request: Request, credential_id: int) -> Response:
+        from users.services import passkey_credential_remove
+
+        passkey_credential_remove(user=request.user, credential_id=credential_id)
+        return Response(status=status.HTTP_204_NO_CONTENT)

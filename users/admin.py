@@ -3,7 +3,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 
-from users.models import CustomUser
+from users.models import CustomUser, WebAuthnCredential
 
 
 @admin.register(CustomUser)
@@ -57,3 +57,25 @@ class CustomUserAdmin(BaseUserAdmin):
     )
 
     readonly_fields = ("date_joined", "last_login")
+
+
+@admin.register(WebAuthnCredential)
+class WebAuthnCredentialAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "user",
+        "device_label",
+        "is_enabled",
+        "sign_count",
+        "created_at",
+    )
+    list_filter = ("is_enabled", "created_at")
+    search_fields = ("user__email", "device_label")
+    readonly_fields = (
+        "credential_id",
+        "public_key",
+        "sign_count",
+        "webauthn_user_id",
+        "created_at",
+    )
+    raw_id_fields = ("user",)

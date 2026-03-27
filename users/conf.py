@@ -40,5 +40,25 @@ class _AppSettings:
     def EMAIL_VERIFICATION_SITE_NAME(self) -> str:
         return getattr(settings, "USERS_EMAIL_VERIFICATION_SITE_NAME", "Afrourban")
 
+    @property
+    def WEBAUTHN_RP_ID(self) -> str:
+        return getattr(settings, "USERS_WEBAUTHN_RP_ID", "localhost")
+
+    @property
+    def WEBAUTHN_RP_NAME(self) -> str:
+        return getattr(settings, "USERS_WEBAUTHN_RP_NAME", "Afrourban")
+
+    @property
+    def WEBAUTHN_ORIGIN(self) -> str:
+        return getattr(settings, "USERS_WEBAUTHN_ORIGIN", "http://localhost:8000")
+
+    @property
+    def WEBAUTHN_CHALLENGE_TIMEOUT_SECONDS(self) -> int:
+        return getattr(settings, "USERS_WEBAUTHN_CHALLENGE_TIMEOUT_SECONDS", 300)
+
+    @property
+    def WEBAUTHN_MAX_CREDENTIALS_PER_USER(self) -> int:
+        return getattr(settings, "USERS_WEBAUTHN_MAX_CREDENTIALS_PER_USER", 5)
+
 
 app_settings = _AppSettings()
