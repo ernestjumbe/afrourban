@@ -10,10 +10,14 @@ import os
 import uuid
 from typing import Any
 
+import structlog
 from django.core.files.uploadedfile import UploadedFile
 from django.db import transaction
+from django.utils import timezone
 
-from profiles.models import Profile
+from profiles.models import AgeVerificationStatus, Profile
+
+logger = structlog.get_logger(__name__)
 
 
 @transaction.atomic
@@ -59,6 +63,25 @@ def profile_update(
     if date_of_birth is not None:
         profile.date_of_birth = date_of_birth
         fields_to_update.append("date_of_birth")
+
+        # Transition verification status and update timestamp
+        # When DOB is provided (or updated), set status to self_declared
+        # and always reset the verification timestamp
+        old_status = profile.age_verification_status
+        if old_status == AgeVerificationStatus.UNVERIFIED:
+            profile.age_verification_status = AgeVerificationStatus.SELF_DECLARED
+            fields_to_update.append("age_verification_status")
+
+            logger.info(
+                "age_verification_status_changed",
+                user_id=profile.user_id,
+                old_status=old_status,
+                new_status=profile.age_verification_status,
+            )
+
+        # Always reset timestamp when DOB is updated
+        profile.age_verified_at = timezone.now()
+        fields_to_update.append("age_verified_at")
 
     if preferences is not None:
         # Merge with existing preferences (shallow merge)
@@ -132,10 +155,35 @@ def avatar_delete(*, profile: Profile) -> None:
 # =============================================================================
 
 
+def evaluate_minimum_age(
+    *,
+    profile: Profile,
+    minimum_age: int,
+) -> tuple[bool, str | None]:
+    """Evaluate minimum age condition against a profile.
+
+    Args:
+        profile: The Profile instance to check.
+        minimum_age: The minimum age required.
+
+    Returns:
+        Tuple of (passes: bool, reason: str | None).
+        Reason codes: None (passes), 'minimum_age_not_met', 'age_unknown'.
+    """
+    if profile.age is None:
+        return False, "age_unknown"
+
+    if profile.age < minimum_age:
+        return False, "minimum_age_not_met"
+
+    return True, None
+
+
 def policy_evaluate(
     *,
     policy: "Policy",
     context: dict[str, Any] | None = None,
+    profile: Profile | None = None,
 ) -> tuple[bool, str | None]:
     """Evaluate a policy's conditions against the provided context.
 
@@ -145,10 +193,12 @@ def policy_evaluate(
     Args:
         policy: The Policy instance to evaluate.
         context: Context dict with request info (ip_address, timestamp, etc.).
+        profile: Profile instance for age-related condition checks.
 
     Returns:
         Tuple of (passes: bool, reason: str | None).
         reason is None if passes is True, otherwise explains the failure.
+        Reason codes for age: 'minimum_age_not_met', 'age_unknown'.
     """
     from datetime import datetime
 
@@ -207,6 +257,15 @@ def policy_evaluate(
         has_mfa = ctx.get("mfa_verified", False)
         if not has_mfa:
             return False, "Multi-factor authentication required"
+
+    # Check minimum_age condition
+    if "minimum_age" in conditions:
+        min_age = conditions["minimum_age"]
+        if profile is None:
+            return False, "age_unknown"
+        passes, reason = evaluate_minimum_age(profile=profile, minimum_age=min_age)
+        if not passes:
+            return False, reason
 
     return True, None
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import date, timedelta
 from typing import Any
 
 from rest_framework import serializers
@@ -44,6 +45,32 @@ class ProfileInputSerializer(serializers.Serializer):
         help_text="User preferences (partial update merged with existing)",
     )
 
+    def validate_date_of_birth(self, value: date | None) -> date | None:
+        """Validate date of birth constraints.
+
+        Args:
+            value: Date to validate.
+
+        Returns:
+            Validated date or None.
+
+        Raises:
+            serializers.ValidationError: If date is invalid.
+        """
+        if value is None:
+            return value
+
+        if value > date.today():
+            raise serializers.ValidationError("Date of birth cannot be in the future.")
+
+        min_date = date.today() - timedelta(days=120 * 365)
+        if value < min_date:
+            raise serializers.ValidationError(
+                "Date of birth cannot be more than 120 years ago."
+            )
+
+        return value
+
 
 class ProfileOutputSerializer(serializers.Serializer):
     """Full profile output serializer for owner view.
@@ -59,6 +86,9 @@ class ProfileOutputSerializer(serializers.Serializer):
     avatar = serializers.SerializerMethodField()
     phone_number = serializers.CharField(allow_blank=True, read_only=True)
     date_of_birth = serializers.DateField(allow_null=True, read_only=True)
+    age = serializers.IntegerField(read_only=True, allow_null=True)
+    age_verification_status = serializers.CharField(read_only=True)
+    age_verified_at = serializers.DateTimeField(read_only=True, allow_null=True)
     preferences = serializers.JSONField(read_only=True)
     created_at = serializers.DateTimeField(read_only=True)
     updated_at = serializers.DateTimeField(read_only=True)
@@ -85,12 +115,17 @@ class ProfilePublicOutputSerializer(serializers.Serializer):
 
     Limited fields for viewing other users' profiles.
     Used for GET /api/profiles/{user_id}/.
+
+    Note: date_of_birth is NOT included (privacy compliance FR-013).
+    Only age and age_verified are exposed.
     """
 
     user_id = serializers.IntegerField(source="user.id", read_only=True)
     display_name = serializers.CharField(allow_blank=True, read_only=True)
     bio = serializers.CharField(allow_blank=True, read_only=True)
     avatar = serializers.SerializerMethodField()
+    age = serializers.IntegerField(read_only=True, allow_null=True)
+    age_verified = serializers.BooleanField(read_only=True)
     created_at = serializers.DateTimeField(read_only=True)
 
     def get_avatar(self, obj: Profile) -> str | None:
@@ -179,6 +214,21 @@ class PolicySummarySerializer(serializers.Serializer):
     id = serializers.IntegerField(read_only=True)
     name = serializers.CharField(read_only=True)
     is_active = serializers.BooleanField(read_only=True)
+
+
+class PolicyCheckOutputSerializer(serializers.Serializer):
+    """Output serializer for policy check response.
+
+    Returns whether the authenticated user passes a specific policy,
+    with reason and message on failure.
+    """
+
+    policy_id = serializers.IntegerField(read_only=True)
+    policy_name = serializers.CharField(read_only=True)
+    passed = serializers.BooleanField(read_only=True)
+    reason = serializers.CharField(read_only=True, allow_null=True, default=None)
+    message = serializers.CharField(read_only=True, allow_null=True, default=None)
+    evaluated_at = serializers.DateTimeField(read_only=True)
 
 
 class AvatarOutputSerializer(serializers.Serializer):
