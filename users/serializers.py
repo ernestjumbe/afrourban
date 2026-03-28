@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 import structlog
 from django.contrib.auth import get_user_model
@@ -138,9 +138,9 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             user: The authenticated user.
 
         Returns:
-            RefreshToken with custom claims.
+            JWT token with custom claims.
         """
-        token = super().get_token(user)
+        token = cast(RefreshToken, super().get_token(user))
 
         # Add custom claims to token payload
         claims = build_token_claims(user)
@@ -158,7 +158,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         Returns:
             Token data with user information.
         """
-        data = super().validate(attrs)
+        data: dict[str, Any] = dict(super().validate(attrs))
 
         if not self.user.is_email_verified:
             logger.info(
@@ -198,7 +198,7 @@ class LogoutSerializer(serializers.Serializer):
     def validate_refresh(self, value: str) -> str:
         """Validate the refresh token."""
         try:
-            RefreshToken(value)
+            RefreshToken(cast(Any, value))
         except Exception as e:
             raise serializers.ValidationError("Invalid refresh token.") from e
         return value

@@ -41,6 +41,7 @@ class ProfileMeView(APIView):
     """
 
     permission_classes = [IsAuthenticated]
+    serializer_class = ProfileOutputSerializer
 
     def get(self, request: Request) -> Response:
         """Get the authenticated user's profile.
@@ -88,6 +89,7 @@ class ProfileAvatarView(APIView):
 
     permission_classes = [IsAuthenticated]
     parser_classes = [MultiPartParser]
+    serializer_class = AvatarUploadSerializer
 
     def post(self, request: Request) -> Response:
         """Upload a new avatar image.
@@ -135,6 +137,7 @@ class ProfilePublicView(APIView):
     """
 
     permission_classes = [IsAuthenticated]
+    serializer_class = ProfilePublicOutputSerializer
 
     def get(self, request: Request, user_id: int) -> Response:
         """Get a user's public profile.
@@ -166,6 +169,7 @@ class PolicyCheckView(APIView):
     """
 
     permission_classes = [IsAuthenticated]
+    serializer_class = PolicyCheckOutputSerializer
 
     REASON_MESSAGES = {
         "minimum_age_not_met": "You must be at least {min_age} years old to access this feature.",

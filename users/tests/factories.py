@@ -1,7 +1,7 @@
 """Test factories for users app."""
 
 import secrets
-from datetime import timedelta
+from datetime import date, timedelta
 
 import factory
 from django.contrib.auth import get_user_model
@@ -57,3 +57,48 @@ class WebAuthnCredentialFactory(factory.django.DjangoModelFactory):
     webauthn_user_id = factory.LazyFunction(lambda: secrets.token_bytes(64))
     device_label = factory.Sequence(lambda n: f"Device {n}")
     is_enabled = True
+
+
+def deprecation_notice_entry(
+    *,
+    target_type: str = "endpoint",
+    target_id: str = "auth.register",
+    status: str = "deprecated",
+    deprecation_date: str | None = None,
+    removal_date: str | None = None,
+    migration_path: str = "/api/v1/auth/register/",
+) -> dict[str, str]:
+    """Create a deprecation notice payload for governance tests."""
+
+    dep_date = deprecation_date or date.today().isoformat()
+    rem_date = removal_date or (date.today() + timedelta(days=90)).isoformat()
+    return {
+        "target_type": target_type,
+        "target_id": target_id,
+        "status": status,
+        "deprecation_date": dep_date,
+        "removal_date": rem_date,
+        "migration_path": migration_path,
+    }
+
+
+def deprecation_registry_payload(
+    *,
+    versions: list[dict[str, str]] | None = None,
+    endpoints: list[dict[str, str]] | None = None,
+    minimum_notice_days: int = 90,
+) -> dict[str, object]:
+    """Create a full deprecation registry payload for tests."""
+
+    return {
+        "policy": {
+            "minimum_notice_days": minimum_notice_days,
+            "required_fields": [
+                "deprecation_date",
+                "removal_date",
+                "migration_path",
+            ],
+        },
+        "versions": versions or [],
+        "endpoints": endpoints or [],
+    }

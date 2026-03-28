@@ -1,0 +1,33 @@
+# Machine-readable API deprecation registry.
+# Dates use ISO format: YYYY-MM-DD.
+
+schema_version: 1
+generated_at: "2026-03-28"
+
+policy:
+  minimum_notice_days: 90
+  required_fields:
+    - deprecation_date
+    - removal_date
+    - migration_path
+
+versions:
+  - target_type: version
+    target_id: v1
+    base_path: /api/v1/
+    status: active
+    deprecation_date: null
+    removal_date: null
+    migration_path: null
+
+endpoints: []
+
+# Reference templates for future entries.
+examples:
+  deprecated_endpoint:
+    target_type: endpoint
+    target_id: auth.legacy-login
+    status: deprecated
+    deprecation_date: "2026-06-01"
+    removal_date: "2026-09-01"
+    migration_path: /api/v2/auth/token/

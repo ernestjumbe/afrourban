@@ -1,18 +1,54 @@
 """URL configuration for afrourban project.
 
-The `urlpatterns` list routes URLs to views. For more information please see:
-    https://docs.djangoproject.com/en/5.1/topics/http/urls/
+API routes are centrally registered in ``api_urlpatterns`` and included under
+the ``/api/`` path prefix.
 """
 
 from django.conf import settings
 from django.contrib import admin
 from django.urls import include, path
 
+from afrourban.api_schema import (
+    InternalSchemaAPIView,
+    InternalSchemaSwaggerView,
+    PublicSchemaAPIView,
+    PublicSchemaSwaggerView,
+)
+from profiles.urls import api_v1_urlpatterns as profiles_api_v1_urlpatterns
+from users.urls import api_v1_urlpatterns as users_api_v1_urlpatterns
+
+api_v1_urlpatterns = [
+    path("", include((users_api_v1_urlpatterns, "users-v1"))),
+    path("profiles/", include((profiles_api_v1_urlpatterns, "profiles-v1"))),
+    path(
+        "docs/public/schema/",
+        PublicSchemaAPIView.as_view(),
+        name="api-schema-public",
+    ),
+    path(
+        "docs/public/",
+        PublicSchemaSwaggerView.as_view(url_name="api-schema-public"),
+        name="api-docs-public",
+    ),
+    path(
+        "docs/internal/schema/",
+        InternalSchemaAPIView.as_view(),
+        name="api-schema-internal",
+    ),
+    path(
+        "docs/internal/",
+        InternalSchemaSwaggerView.as_view(url_name="api-schema-internal"),
+        name="api-docs-internal",
+    ),
+]
+
+api_urlpatterns = [
+    path("v1/", include(api_v1_urlpatterns)),
+]
+
 urlpatterns = [
     path("admin/", admin.site.urls),
-    # API endpoints
-    path("api/", include("users.urls")),
-    path("api/profiles/", include("profiles.urls")),
+    path("api/", include(api_urlpatterns)),
 ]
 
 if settings.DEBUG:

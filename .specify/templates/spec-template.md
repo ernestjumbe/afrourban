@@ -95,6 +95,19 @@
 - **FR-006**: System MUST authenticate users via [NEEDS CLARIFICATION: auth method not specified - email/password, SSO, OAuth?]
 - **FR-007**: System MUST retain user data for [NEEDS CLARIFICATION: retention period not specified]
 
+### API Contract & Versioning *(mandatory when APIs are added or changed)*
+
+- **API-001**: API documentation MUST be generated and maintained with
+  `drf-spectacular`, and schema output MUST be OpenAPI 3.0+.
+- **API-002**: API endpoints MUST be explicitly versioned (for example,
+  `/api/v1/`, `/api/v2/`) and the target version MUST be stated.
+- **API-003**: All API routes MUST be registered in `api_urlpatterns` in
+  the main `urls.py`, then included under the `/api/` namespace.
+- **API-004**: If an endpoint/version is deprecated, the spec MUST define
+  deprecation date, planned removal date, and migration path.
+- **API-005**: If the feature has no API impact, mark this section as
+  `N/A` with a short justification.
+
 ### Key Entities *(include if feature involves data)*
 
 - **[Entity 1]**: [What it represents, key attributes without implementation]
@@ -113,3 +126,16 @@
 - **SC-002**: [Measurable metric, e.g., "System handles 1000 concurrent users without degradation"]
 - **SC-003**: [User satisfaction metric, e.g., "90% of users successfully complete primary task on first attempt"]
 - **SC-004**: [Business metric, e.g., "Reduce support tickets related to [X] by 50%"]
+
+## Assumptions
+
+<!--
+  ACTION REQUIRED: The content in this section represents placeholders.
+  Fill them out with the right assumptions based on reasonable defaults
+  chosen when the feature description did not specify certain details.
+-->
+
+- [Assumption about target users, e.g., "Users have stable internet connectivity"]
+- [Assumption about scope boundaries, e.g., "Mobile support is out of scope for v1"]
+- [Assumption about data/environment, e.g., "Existing authentication system will be reused"]
+- [Dependency on existing system/service, e.g., "Requires access to the existing user profile API"]

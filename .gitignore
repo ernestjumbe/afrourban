@@ -130,6 +130,9 @@ venv.bak/
 .dmypy.json
 dmypy.json
 
+# ruff
+.ruff_cache/
+
 # Pyre type checker
 .pyre/
 
@@ -144,8 +147,10 @@ cython_debug/
 .idea/
 *.swp
 *.swo
+*.tmp
 *~
 .DS_Store
+Thumbs.db
 
 # Database
 *.db
