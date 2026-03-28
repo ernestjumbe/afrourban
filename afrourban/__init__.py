@@ -1,0 +1,1 @@
+"""Afrourban Django project package."""

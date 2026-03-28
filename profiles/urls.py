@@ -1,12 +1,7 @@
 """URL configuration for profiles app.
 
-Mounted at /api/profiles/ in main urls.py.
-
-Routes:
-- /me/ - GET, PATCH current user's profile
-- /me/avatar/ - POST, DELETE avatar
-- /policies/{policy_id}/check/ - GET policy check
-- /{user_id}/ - GET public profile
+Exported route groups:
+- `api_v1_urlpatterns` for canonical inclusion under `/api/v1/profiles/`
 """
 
 from django.urls import path
@@ -20,7 +15,8 @@ from profiles.views import (
 
 app_name = "profiles"
 
-urlpatterns = [
+# Authenticated profile URLs (mounted at /api/v1/profiles/)
+authenticated_profile_urlpatterns: list = [
     path("me/", ProfileMeView.as_view(), name="me"),
     path("me/avatar/", ProfileAvatarView.as_view(), name="me-avatar"),
     path(
@@ -30,3 +26,8 @@ urlpatterns = [
     ),
     path("<int:user_id>/", ProfilePublicView.as_view(), name="public"),
 ]
+
+api_v1_urlpatterns: list = authenticated_profile_urlpatterns
+
+# Canonical versioned routes for module-level includes.
+urlpatterns = api_v1_urlpatterns

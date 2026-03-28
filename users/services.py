@@ -14,10 +14,13 @@ from typing import TYPE_CHECKING
 import structlog
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
+from django.contrib.auth.tokens import default_token_generator
 from django.core.cache import cache
 from django.core.mail import send_mail
 from django.db import transaction
 from django.template.loader import render_to_string
+from django.utils.encoding import force_bytes, force_str
+from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
@@ -398,11 +401,6 @@ def role_delete(*, role: "Group", force: bool = False) -> None:
 # =============================================================================
 # Password Management Services (Phase 8: User Story 6)
 # =============================================================================
-
-
-from django.contrib.auth.tokens import default_token_generator
-from django.utils.encoding import force_bytes, force_str
-from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 
 
 def password_reset_request(*, email: str) -> dict[str, str] | None:

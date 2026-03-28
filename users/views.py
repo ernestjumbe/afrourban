@@ -1,5 +1,7 @@
 """User API views for registration and authentication."""
 
+from typing import Any
+
 from django.contrib.auth import get_user_model
 from rest_framework import status
 from rest_framework.exceptions import NotFound, ValidationError
@@ -28,6 +30,16 @@ from users.serializers import (
     AdminUserUpdateInputSerializer,
     CustomTokenObtainPairSerializer,
     LogoutSerializer,
+    PasskeyAddCompleteInputSerializer,
+    PasskeyAddOptionsInputSerializer,
+    PasskeyAuthenticateCompleteInputSerializer,
+    PasskeyAuthenticateOptionsOutputSerializer,
+    PasskeyCredentialListOutputSerializer,
+    PasskeyRegisterCompleteInputSerializer,
+    PasskeyRegisterOptionsInputSerializer,
+    PasswordChangeSerializer,
+    PasswordResetConfirmSerializer,
+    PasswordResetRequestSerializer,
     PermissionsInputSerializer,
     PermissionsOutputSerializer,
     RegisterInputSerializer,
@@ -59,11 +71,12 @@ User = get_user_model()
 class RegisterView(APIView):
     """API view for user registration.
 
-    POST /api/auth/register/
+    POST /api/v1/auth/register/
     Creates a new user account with an associated profile.
     """
 
     permission_classes = [AllowAny]
+    serializer_class = RegisterInputSerializer
 
     def post(self, request: Request) -> Response:
         """Handle user registration.
@@ -90,11 +103,12 @@ class RegisterView(APIView):
 class VerifyEmailView(APIView):
     """API view for email verification.
 
-    POST /api/auth/email-verification/verify/
+    POST /api/v1/auth/email-verification/verify/
     Validates a verification token and marks the user's email as verified.
     """
 
     permission_classes = [AllowAny]
+    serializer_class = VerifyEmailInputSerializer
 
     def post(self, request: Request) -> Response:
         serializer = VerifyEmailInputSerializer(data=request.data)
@@ -108,11 +122,12 @@ class VerifyEmailView(APIView):
 class ResendVerificationEmailView(APIView):
     """API view for resending a verification email.
 
-    POST /api/auth/email-verification/resend/
+    POST /api/v1/auth/email-verification/resend/
     Always returns 200 OK to prevent user enumeration.
     """
 
     permission_classes = [AllowAny]
+    serializer_class = ResendVerificationEmailInputSerializer
 
     def post(self, request: Request) -> Response:
         serializer = ResendVerificationEmailInputSerializer(data=request.data)
@@ -126,7 +141,7 @@ class ResendVerificationEmailView(APIView):
 class CustomTokenObtainPairView(TokenObtainPairView):
     """Custom JWT token obtain view.
 
-    POST /api/auth/token/
+    POST /api/v1/auth/token/
     Returns access and refresh tokens along with user data and policies.
     """
 
@@ -136,7 +151,7 @@ class CustomTokenObtainPairView(TokenObtainPairView):
 class TokenRefreshView(BaseTokenRefreshView):
     """JWT token refresh view.
 
-    POST /api/auth/token/refresh/
+    POST /api/v1/auth/token/refresh/
     Returns new access token (and rotated refresh token).
     """
 
@@ -146,7 +161,7 @@ class TokenRefreshView(BaseTokenRefreshView):
 class TokenVerifyView(BaseTokenVerifyView):
     """JWT token verification view.
 
-    POST /api/auth/token/verify/
+    POST /api/v1/auth/token/verify/
     Verifies that a token is valid.
     """
 
@@ -156,11 +171,12 @@ class TokenVerifyView(BaseTokenVerifyView):
 class LogoutView(APIView):
     """API view for user logout.
 
-    POST /api/auth/logout/
+    POST /api/v1/auth/logout/
     Blacklists the provided refresh token.
     """
 
     permission_classes = [IsAuthenticated]
+    serializer_class = LogoutSerializer
 
     def post(self, request: Request) -> Response:
         """Handle user logout by blacklisting refresh token.
@@ -192,11 +208,12 @@ class LogoutView(APIView):
 class AdminUserListView(APIView):
     """Admin view for listing users.
 
-    GET /api/admin/users/
+    GET /api/v1/admin/users/
     List all users with pagination, filtering, and search.
     """
 
     permission_classes = [IsStaffUser]
+    serializer_class = AdminUserListSerializer
 
     def get(self, request: Request) -> Response:
         """List users with optional filters.
@@ -265,11 +282,12 @@ class AdminUserListView(APIView):
 class AdminUserDetailView(APIView):
     """Admin view for user detail and updates.
 
-    GET /api/admin/users/{user_id}/
-    PATCH /api/admin/users/{user_id}/
+    GET /api/v1/admin/users/{user_id}/
+    PATCH /api/v1/admin/users/{user_id}/
     """
 
     permission_classes = [IsStaffUser]
+    serializer_class = AdminUserDetailSerializer
 
     def get(self, request: Request, user_id: int) -> Response:
         """Get detailed user information.
@@ -325,10 +343,11 @@ class AdminUserDetailView(APIView):
 class AdminUserActivateView(APIView):
     """Admin view for activating user accounts.
 
-    POST /api/admin/users/{user_id}/activate/
+    POST /api/v1/admin/users/{user_id}/activate/
     """
 
     permission_classes = [IsStaffUser]
+    serializer_class = UserActivationOutputSerializer
 
     def post(self, request: Request, user_id: int) -> Response:
         """Activate a user account.
@@ -360,10 +379,11 @@ class AdminUserActivateView(APIView):
 class AdminUserDeactivateView(APIView):
     """Admin view for deactivating user accounts.
 
-    POST /api/admin/users/{user_id}/deactivate/
+    POST /api/v1/admin/users/{user_id}/deactivate/
     """
 
     permission_classes = [IsStaffUser]
+    serializer_class = UserActivationOutputSerializer
 
     def post(self, request: Request, user_id: int) -> Response:
         """Deactivate a user account.
@@ -399,11 +419,12 @@ class AdminUserDeactivateView(APIView):
 class AdminUserPermissionsView(APIView):
     """Admin view for managing user permissions.
 
-    GET /api/admin/users/{user_id}/permissions/
-    PUT /api/admin/users/{user_id}/permissions/
+    GET /api/v1/admin/users/{user_id}/permissions/
+    PUT /api/v1/admin/users/{user_id}/permissions/
     """
 
     permission_classes = [IsStaffUser]
+    serializer_class = PermissionsOutputSerializer
 
     def get(self, request: Request, user_id: int) -> Response:
         """Get user's effective permissions.
@@ -466,11 +487,12 @@ class AdminUserPermissionsView(APIView):
 class AdminRoleListView(APIView):
     """Admin view for listing and creating roles.
 
-    GET /api/admin/users/roles/
-    POST /api/admin/users/roles/
+    GET /api/v1/admin/users/roles/
+    POST /api/v1/admin/users/roles/
     """
 
     permission_classes = [IsStaffUser]
+    serializer_class = RoleListSerializer
 
     def get(self, request: Request) -> Response:
         """List all available roles.
@@ -515,12 +537,13 @@ class AdminRoleListView(APIView):
 class AdminRoleDetailView(APIView):
     """Admin view for role detail, update, and deletion.
 
-    GET /api/admin/users/roles/{role_id}/
-    PATCH /api/admin/users/roles/{role_id}/
-    DELETE /api/admin/users/roles/{role_id}/
+    GET /api/v1/admin/users/roles/{role_id}/
+    PATCH /api/v1/admin/users/roles/{role_id}/
+    DELETE /api/v1/admin/users/roles/{role_id}/
     """
 
     permission_classes = [IsStaffUser]
+    serializer_class = RoleDetailSerializer
 
     def get(self, request: Request, role_id: int) -> Response:
         """Get role details.
@@ -623,11 +646,12 @@ class AdminRoleDetailView(APIView):
 class PasswordResetRequestView(APIView):
     """API view for password reset request.
 
-    POST /api/auth/password/reset/
+    POST /api/v1/auth/password/reset/
     Requests a password reset link via email.
     """
 
     permission_classes = [AllowAny]
+    serializer_class = PasswordResetRequestSerializer
 
     def post(self, request: Request) -> Response:
         """Request password reset.
@@ -651,7 +675,7 @@ class PasswordResetRequestView(APIView):
 
         # In development, include token data for testing
         # In production, this would just return the generic message
-        response_data = {
+        response_data: dict[str, Any] = {
             "detail": "If an account exists with this email, a password reset link has been sent."
         }
 
@@ -667,11 +691,12 @@ class PasswordResetRequestView(APIView):
 class PasswordResetConfirmView(APIView):
     """API view for password reset confirmation.
 
-    POST /api/auth/password/reset/confirm/
+    POST /api/v1/auth/password/reset/confirm/
     Completes password reset with token from email.
     """
 
     permission_classes = [AllowAny]
+    serializer_class = PasswordResetConfirmSerializer
 
     def post(self, request: Request) -> Response:
         """Complete password reset.
@@ -705,11 +730,12 @@ class PasswordResetConfirmView(APIView):
 class PasswordChangeView(APIView):
     """API view for authenticated password change.
 
-    POST /api/auth/password/change/
+    POST /api/v1/auth/password/change/
     Changes password for authenticated user.
     """
 
     permission_classes = [IsAuthenticated]
+    serializer_class = PasswordChangeSerializer
 
     def post(self, request: Request) -> Response:
         """Change password for the authenticated user.
@@ -749,11 +775,12 @@ class PasswordChangeView(APIView):
 class PasskeyRegisterOptionsView(APIView):
     """API view for passkey registration options.
 
-    POST /api/auth/passkey/register/options/
+    POST /api/v1/auth/passkey/register/options/
     Initiates the passkey registration ceremony.
     """
 
     permission_classes = [AllowAny]
+    serializer_class = PasskeyRegisterOptionsInputSerializer
 
     def post(self, request: Request) -> Response:
         from users.serializers import (
@@ -784,11 +811,12 @@ class PasskeyRegisterOptionsView(APIView):
 class PasskeyRegisterCompleteView(APIView):
     """API view for passkey registration completion.
 
-    POST /api/auth/passkey/register/complete/
+    POST /api/v1/auth/passkey/register/complete/
     Completes registration, creates user, triggers email verification.
     """
 
     permission_classes = [AllowAny]
+    serializer_class = PasskeyRegisterCompleteInputSerializer
 
     def post(self, request: Request) -> Response:
         from users.serializers import (
@@ -824,11 +852,12 @@ class PasskeyRegisterCompleteView(APIView):
 class PasskeyAuthenticateOptionsView(APIView):
     """API view for passkey authentication options.
 
-    POST /api/auth/passkey/authenticate/options/
+    POST /api/v1/auth/passkey/authenticate/options/
     Initiates the passkey authentication ceremony (discoverable credentials).
     """
 
     permission_classes = [AllowAny]
+    serializer_class = PasskeyAuthenticateOptionsOutputSerializer
 
     def post(self, request: Request) -> Response:
         import json
@@ -850,11 +879,12 @@ class PasskeyAuthenticateOptionsView(APIView):
 class PasskeyAuthenticateCompleteView(APIView):
     """API view for passkey authentication completion.
 
-    POST /api/auth/passkey/authenticate/complete/
+    POST /api/v1/auth/passkey/authenticate/complete/
     Verifies assertion and returns JWT tokens.
     """
 
     permission_classes = [AllowAny]
+    serializer_class = PasskeyAuthenticateCompleteInputSerializer
 
     def post(self, request: Request) -> Response:
         from users.serializers import (
@@ -883,11 +913,12 @@ class PasskeyAuthenticateCompleteView(APIView):
 class PasskeyAddOptionsView(APIView):
     """API view for adding a passkey to an existing account.
 
-    POST /api/auth/passkey/add/options/
+    POST /api/v1/auth/passkey/add/options/
     Initiates passkey addition for an authenticated user.
     """
 
     permission_classes = [IsAuthenticated]
+    serializer_class = PasskeyAddOptionsInputSerializer
 
     def post(self, request: Request) -> Response:
         import json
@@ -918,11 +949,12 @@ class PasskeyAddOptionsView(APIView):
 class PasskeyAddCompleteView(APIView):
     """API view for completing passkey addition.
 
-    POST /api/auth/passkey/add/complete/
+    POST /api/v1/auth/passkey/add/complete/
     Completes passkey addition for an authenticated user.
     """
 
     permission_classes = [IsAuthenticated]
+    serializer_class = PasskeyAddCompleteInputSerializer
 
     def post(self, request: Request) -> Response:
         from users.serializers import (
@@ -947,11 +979,12 @@ class PasskeyAddCompleteView(APIView):
 class PasskeyListView(APIView):
     """API view for listing a user's passkey credentials.
 
-    GET /api/auth/passkey/
+    GET /api/v1/auth/passkey/
     Returns the authenticated user's registered passkeys.
     """
 
     permission_classes = [IsAuthenticated]
+    serializer_class = PasskeyCredentialListOutputSerializer
 
     def get(self, request: Request) -> Response:
         from users.selectors import passkey_credentials_list
@@ -968,11 +1001,12 @@ class PasskeyListView(APIView):
 class PasskeyRemoveView(APIView):
     """API view for removing a passkey credential.
 
-    DELETE /api/auth/passkey/<credential_id>/
+    DELETE /api/v1/auth/passkey/<credential_id>/
     Removes a passkey credential from the authenticated user's account.
     """
 
     permission_classes = [IsAuthenticated]
+    serializer_class = PasskeyCredentialListOutputSerializer
 
     def delete(self, request: Request, credential_id: int) -> Response:
         from users.services import passkey_credential_remove

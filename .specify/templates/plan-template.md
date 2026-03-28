@@ -31,7 +31,22 @@
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-[Gates determined based on constitution file]
+- [ ] **Styleguide gate**: Design keeps business logic in
+      services/selectors, keeps models thin, and uses dedicated API
+      serializers.
+- [ ] **API contract gate**: API changes define versioned paths
+      (`/api/v{n}/`), update `drf-spectacular` OpenAPI 3.0+ schema, and
+      register routes via `api_urlpatterns` in main `urls.py` under
+      `/api/`.
+- [ ] **Deprecation gate**: Any deprecated endpoint/version documents
+      deprecation date, planned removal date, and migration path.
+- [ ] **Testing gate**: Test-first approach is explicit; failing tests
+      are planned before implementation.
+- [ ] **Quality gate**: Plan includes Ruff, mypy, pytest, and API schema
+      validation (`manage.py spectacular --validate`) for API changes.
+- [ ] **Observability gate**: Structured JSON logging and request
+      context strategy are defined.
+- [ ] **Toolchain gate**: All commands run through `poetry run`.
 
 ## Project Structure
 

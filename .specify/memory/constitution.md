@@ -1,20 +1,17 @@
 <!--
   Sync Impact Report
   ==================
-  Version change: N/A → 1.0.0
-  Modified principles: N/A (initial ratification)
-  Added sections:
-    - Core Principles (7 principles)
-    - Technology Stack
-    - Development Workflow
-    - Governance
+  Version change: 1.0.0 → 1.1.0
+  Modified principles:
+    - II. API-First Design (expanded API schema, versioning, deprecation, and URL routing rules)
+  Added sections: None
   Removed sections: None
   Templates requiring updates:
-    - .specify/templates/plan-template.md ✅ no changes required
-    - .specify/templates/spec-template.md ✅ no changes required
-    - .specify/templates/tasks-template.md ✅ no changes required
-    - .specify/templates/checklist-template.md ✅ no changes required
-    - .specify/templates/agent-file-template.md ✅ no changes required
+    - .specify/templates/plan-template.md ✅ updated
+    - .specify/templates/spec-template.md ✅ updated
+    - .specify/templates/tasks-template.md ✅ updated
+    - .specify/templates/commands/*.md ⚠ directory not present (no action taken)
+    - README.md ✅ no changes required
   Follow-up TODOs: None
 -->
 
@@ -52,13 +49,22 @@ presentation layer is built, following the
 - Endpoints MUST use standard HTTP methods (GET, POST, PUT, PATCH,
   DELETE) with correct status codes.
 - Collection endpoints MUST support filtering, pagination, and sorting.
-- API versioning strategy MUST be defined before the first public
-  release.
+- API documentation MUST be generated and maintained with
+  `drf-spectacular`, and the published schema MUST use OpenAPI 3.0+.
+- APIs MUST be explicitly versioned with URL namespaces such as
+  `/api/v1/`, `/api/v2/`, and so on.
+- All API URL routes MUST be registered in an `api_urlpatterns` list in
+  the main `urls.py`, then included under the `/api/` namespace.
+- Breaking API changes MUST be introduced in a new version namespace
+  rather than replacing existing versioned endpoints in place.
+- Deprecated API versions MUST include a documented deprecation policy
+  with deprecation date, planned removal date, and migration path.
 - Error responses MUST use a consistent JSON envelope with `type`,
   `title`, `status`, and `detail` fields (RFC 9457 Problem Details).
 
 **Rationale**: API-first decouples frontend from backend and enables
-third-party integrations from day one.
+third-party integrations from day one while keeping contracts explicit
+and safely evolvable over time.
 
 ### III. Test-First Development
 
@@ -155,6 +161,7 @@ environments across development, CI, and production.
 | Test Runner | pytest | latest stable |
 | Linter/Formatter | Ruff | latest stable |
 | Type Checker | mypy | latest stable |
+| API Schema | drf-spectacular | OpenAPI 3.0+ |
 | Logging | structlog or python-json-logger | latest stable |
 | WSGI Server (prd) | Gunicorn | latest stable |
 | Containerisation | Docker + docker-compose | per compose files |
@@ -182,7 +189,9 @@ environments across development, CI, and production.
 2. **Write tests first**: Add failing tests for the new behaviour.
 3. **Implement**: Write the minimal code to make tests pass.
 4. **Quality gates**: Run `poetry run ruff check .`,
-   `poetry run mypy .`, and `poetry run pytest` — all MUST pass.
+   `poetry run mypy .`, and `poetry run pytest` — all MUST pass. For
+   API contract changes, `poetry run python manage.py spectacular
+   --file schema.yaml --validate` MUST also pass.
 5. **Review**: Open a pull request; reviewers MUST verify constitution
    compliance.
 6. **Merge**: Squash-merge into `main` after approval.
@@ -192,6 +201,8 @@ environments across development, CI, and production.
 - `poetry run ruff check .` — zero warnings
 - `poetry run mypy .` — zero errors
 - `poetry run pytest` — all tests green
+- `poetry run python manage.py spectacular --file schema.yaml --validate`
+  — required for API changes; schema validation MUST pass
 
 ## Governance
 
@@ -201,6 +212,10 @@ informal agreements, or ad-hoc practices.
 
 - **Compliance**: Every pull request MUST be reviewed against these
   principles. Violations MUST be resolved before merge.
+- **API compliance evidence**: Pull requests that add or modify APIs
+  MUST show `drf-spectacular` schema updates, versioned path compliance,
+  `api_urlpatterns` registration in main `urls.py`, and deprecation
+  policy updates when applicable.
 - **Amendments**: Any change to this constitution MUST be proposed via
   pull request, reviewed by at least one maintainer, and documented
   with a version bump.
@@ -212,4 +227,4 @@ informal agreements, or ad-hoc practices.
   MUST be documented in the relevant plan's Complexity Tracking table
   with a clear rationale and rejected alternatives.
 
-**Version**: 1.0.0 | **Ratified**: 2026-03-19 | **Last Amended**: 2026-03-19
+**Version**: 1.1.0 | **Ratified**: 2026-03-19 | **Last Amended**: 2026-03-27

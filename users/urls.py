@@ -1,10 +1,7 @@
 """URL configuration for users app.
 
-This module defines URL patterns for:
-- Authentication endpoints: /api/auth/*
-- Password management: /api/auth/password/*
-- Admin user management: /api/admin/users/*
-- Admin role management: /api/admin/users/roles/*
+Exported route groups:
+- `api_v1_urlpatterns` for canonical inclusion under `/api/v1/`
 """
 
 from django.urls import include, path
@@ -39,13 +36,12 @@ from users.views import (
 
 app_name = "users"
 
-# Authentication URLs (mounted at /api/auth/)
-auth_urlpatterns: list = [
+# Public authentication URLs (mounted at /api/v1/auth/)
+public_auth_urlpatterns: list = [
     path("register/", RegisterView.as_view(), name="register"),
     path("token/", CustomTokenObtainPairView.as_view(), name="token_obtain_pair"),
     path("token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
     path("token/verify/", TokenVerifyView.as_view(), name="token_verify"),
-    path("logout/", LogoutView.as_view(), name="logout"),
     # Email verification
     path(
         "email-verification/verify/",
@@ -68,7 +64,6 @@ auth_urlpatterns: list = [
         PasswordResetConfirmView.as_view(),
         name="password_reset_confirm",
     ),
-    path("password/change/", PasswordChangeView.as_view(), name="password_change"),
     # Passkey registration
     path(
         "passkey/register/options/",
@@ -91,6 +86,12 @@ auth_urlpatterns: list = [
         PasskeyAuthenticateCompleteView.as_view(),
         name="passkey_authenticate_complete",
     ),
+]
+
+# Authenticated authentication URLs (mounted at /api/v1/auth/)
+authenticated_auth_urlpatterns: list = [
+    path("logout/", LogoutView.as_view(), name="logout"),
+    path("password/change/", PasswordChangeView.as_view(), name="password_change"),
     # Passkey add to existing account
     path(
         "passkey/add/options/",
@@ -115,7 +116,12 @@ auth_urlpatterns: list = [
     ),
 ]
 
-# Admin user management URLs (mounted at /api/admin/users/)
+auth_urlpatterns: list = [
+    *public_auth_urlpatterns,
+    *authenticated_auth_urlpatterns,
+]
+
+# Admin user management URLs (mounted at /api/v1/admin/users/)
 admin_urlpatterns: list = [
     path("", AdminUserListView.as_view(), name="admin-user-list"),
     path("roles/", AdminRoleListView.as_view(), name="admin-role-list"),
@@ -140,7 +146,10 @@ admin_urlpatterns: list = [
     ),
 ]
 
-urlpatterns = [
+api_v1_urlpatterns: list = [
     path("auth/", include((auth_urlpatterns, "auth"))),
     path("admin/users/", include((admin_urlpatterns, "admin-users"))),
 ]
+
+# Canonical versioned routes for module-level includes.
+urlpatterns = api_v1_urlpatterns

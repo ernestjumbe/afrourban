@@ -6,14 +6,14 @@ are used for all read operations (queries).
 
 from __future__ import annotations
 
-from django.contrib.auth import get_user_model
+from typing import TYPE_CHECKING
 
 from profiles.models import Profile
 
-User = get_user_model()
+if TYPE_CHECKING:
+    from users.models import CustomUser
 
-
-def profile_get_by_user(*, user: User) -> Profile:
+def profile_get_by_user(*, user: CustomUser) -> Profile:
     """Get profile for the given user.
 
     Args:

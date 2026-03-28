@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import os
 import uuid
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import structlog
 from django.core.files.uploadedfile import UploadedFile
@@ -18,6 +18,9 @@ from django.utils import timezone
 from profiles.models import AgeVerificationStatus, Profile
 
 logger = structlog.get_logger(__name__)
+
+if TYPE_CHECKING:
+    from profiles.models import Policy
 
 
 @transaction.atomic
@@ -181,7 +184,7 @@ def evaluate_minimum_age(
 
 def policy_evaluate(
     *,
-    policy: "Policy",
+    policy: Policy,
     context: dict[str, Any] | None = None,
     profile: Profile | None = None,
 ) -> tuple[bool, str | None]:

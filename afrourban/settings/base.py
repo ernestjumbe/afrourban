@@ -35,6 +35,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     # Third-party apps
     "rest_framework",
+    "drf_spectacular",
     "rest_framework_simplejwt",
     "rest_framework_simplejwt.token_blacklist",
     # Local apps
@@ -139,7 +140,17 @@ REST_FRAMEWORK = {
     "DEFAULT_RENDERER_CLASSES": [
         "rest_framework.renderers.JSONRenderer",
     ],
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "EXCEPTION_HANDLER": "afrourban.exceptions.problem_details_exception_handler",
+}
+
+SPECTACULAR_SETTINGS = {
+    "TITLE": "Afrourban API",
+    "DESCRIPTION": "Versioned API schema for Afrourban",
+    "VERSION": "v1",
+    "SERVE_INCLUDE_SCHEMA": False,
+    "SORT_OPERATIONS": True,
+    "SCHEMA_PATH_PREFIX": r"^/api/v1",
 }
 
 # Simple JWT

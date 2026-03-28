@@ -18,7 +18,7 @@ class TestRegisterSendsVerificationEmail:
     def test_register_sends_verification_email(self, mailoutbox):
         client = APIClient()
         response = client.post(
-            "/api/auth/register/",
+            "/api/v1/auth/register/",
             {
                 "email": "new@example.com",
                 "password": "StrongPass123!",
@@ -37,7 +37,7 @@ class TestRegisterSendsVerificationEmail:
 
 @pytest.mark.django_db
 class TestVerifyValidToken:
-    """POST /api/auth/email-verification/verify/ with a valid token."""
+    """POST /api/v1/auth/email-verification/verify/ with a valid token."""
 
     def test_verify_valid_token_returns_200(self):
         user = UserFactory(is_email_verified=False)
@@ -45,7 +45,7 @@ class TestVerifyValidToken:
 
         client = APIClient()
         response = client.post(
-            "/api/auth/email-verification/verify/",
+            "/api/v1/auth/email-verification/verify/",
             {"token": token_obj.token},
             format="json",
         )
@@ -59,7 +59,7 @@ class TestVerifyValidToken:
 
         client = APIClient()
         client.post(
-            "/api/auth/email-verification/verify/",
+            "/api/v1/auth/email-verification/verify/",
             {"token": token_obj.token},
             format="json",
         )
@@ -73,7 +73,7 @@ class TestVerifyValidToken:
 
         client = APIClient()
         client.post(
-            "/api/auth/email-verification/verify/",
+            "/api/v1/auth/email-verification/verify/",
             {"token": token_obj.token},
             format="json",
         )
@@ -92,7 +92,7 @@ class TestVerifiedUserCanLogin:
 
         client = APIClient()
         response = client.post(
-            "/api/auth/token/",
+            "/api/v1/auth/token/",
             {"email": user.email, "password": "TestPass123!"},
             format="json",
         )
@@ -116,7 +116,7 @@ class TestRegisterSupersedesUnverified:
 
         client = APIClient()
         response = client.post(
-            "/api/auth/register/",
+            "/api/v1/auth/register/",
             {
                 "email": old_email,
                 "password": "NewStrongPass123!",
@@ -157,7 +157,7 @@ class TestUnverifiedUserLoginBlocked:
 
         client = APIClient()
         response = client.post(
-            "/api/auth/token/",
+            "/api/v1/auth/token/",
             {"email": user.email, "password": "TestPass123!"},
             format="json",
         )
@@ -171,7 +171,7 @@ class TestUnverifiedUserLoginBlocked:
 
         client = APIClient()
         response = client.post(
-            "/api/auth/token/",
+            "/api/v1/auth/token/",
             {"email": user.email, "password": "TestPass123!"},
             format="json",
         )
@@ -187,7 +187,7 @@ class TestUnverifiedUserLoginBlocked:
 
         client = APIClient()
         response = client.post(
-            "/api/auth/token/",
+            "/api/v1/auth/token/",
             {"email": user.email, "password": "TestPass123!"},
             format="json",
         )
@@ -209,7 +209,7 @@ class TestUnverifiedUserLoginBlocked:
 
         client = APIClient()
         response = client.post(
-            "/api/auth/token/",
+            "/api/v1/auth/token/",
             {"email": user.email, "password": "TestPass123!"},
             format="json",
         )
@@ -234,7 +234,7 @@ class TestExpiredOrInvalidTokenRejected:
 
         client = APIClient()
         response = client.post(
-            "/api/auth/email-verification/verify/",
+            "/api/v1/auth/email-verification/verify/",
             {"token": token_obj.token},
             format="json",
         )
@@ -250,7 +250,7 @@ class TestExpiredOrInvalidTokenRejected:
 
         client = APIClient()
         client.post(
-            "/api/auth/email-verification/verify/",
+            "/api/v1/auth/email-verification/verify/",
             {"token": token_value},
             format="json",
         )
@@ -260,7 +260,7 @@ class TestExpiredOrInvalidTokenRejected:
     def test_invalid_token_string_returns_400_token_invalid(self):
         client = APIClient()
         response = client.post(
-            "/api/auth/email-verification/verify/",
+            "/api/v1/auth/email-verification/verify/",
             {"token": "completely-bogus-token-string"},
             format="json",
         )
@@ -276,14 +276,14 @@ class TestExpiredOrInvalidTokenRejected:
         # Consume the token
         client = APIClient()
         client.post(
-            "/api/auth/email-verification/verify/",
+            "/api/v1/auth/email-verification/verify/",
             {"token": token_value},
             format="json",
         )
 
         # Try again with the same token
         response = client.post(
-            "/api/auth/email-verification/verify/",
+            "/api/v1/auth/email-verification/verify/",
             {"token": token_value},
             format="json",
         )
@@ -306,7 +306,7 @@ class TestResendVerificationEmail:
 
         client = APIClient()
         response = client.post(
-            "/api/auth/email-verification/resend/",
+            "/api/v1/auth/email-verification/resend/",
             {"email": user.email},
             format="json",
         )
@@ -324,7 +324,7 @@ class TestResendVerificationEmail:
 
         client = APIClient()
         client.post(
-            "/api/auth/email-verification/resend/",
+            "/api/v1/auth/email-verification/resend/",
             {"email": user.email},
             format="json",
         )
@@ -340,7 +340,7 @@ class TestResendVerificationEmail:
 
         client = APIClient()
         client.post(
-            "/api/auth/email-verification/resend/",
+            "/api/v1/auth/email-verification/resend/",
             {"email": user.email},
             format="json",
         )
@@ -352,7 +352,7 @@ class TestResendVerificationEmail:
 
         client = APIClient()
         response = client.post(
-            "/api/auth/email-verification/resend/",
+            "/api/v1/auth/email-verification/resend/",
             {"email": user.email},
             format="json",
         )
@@ -365,7 +365,7 @@ class TestResendVerificationEmail:
     def test_resend_for_unknown_email_returns_200_no_email_sent(self):
         client = APIClient()
         response = client.post(
-            "/api/auth/email-verification/resend/",
+            "/api/v1/auth/email-verification/resend/",
             {"email": "nobody@example.com"},
             format="json",
         )
