@@ -152,3 +152,33 @@ Compatibility check for this release:
 - `/api/v1/` remains the canonical namespace.
 - `POST /api/v1/auth/token/` still authenticates with `email` and `password`.
 - No version or endpoint deprecation entry is introduced by feature 006.
+
+## 7. Feature 007 Release Checks
+
+Run the feature-specific contract coverage:
+
+```bash
+poetry run pytest \
+  health/tests/test_services.py \
+  health/tests/test_api_health.py \
+  health/tests/test_api_docs.py -q
+```
+
+Expected result:
+
+- anonymous callers can use `GET /api/v1/health/` without sign-in
+- authenticated callers receive the same healthy response semantics as
+  anonymous callers
+- public and internal schema output both include `/api/v1/health/`
+- the schema entry documents the `200` and `503` status-only response contract
+- dependency failures do not flip the endpoint unhealthy while the application
+  process can still serve requests
+- health responses never expose dependency diagnostics or extra metadata
+
+Compatibility check for this release:
+
+- `/api/v1/health/` remains public and documented in both schema views
+- health responses stay machine-readable and status-only
+- dependency failures remain outside the health evaluation scope
+- health evaluations emit one structured `health_check_evaluated` event per
+  request

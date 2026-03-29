@@ -19,6 +19,7 @@ their documentation visibility.
 | POST | `/api/v1/auth/passkey/register/complete/` | public | none | yes | yes |
 | POST | `/api/v1/auth/passkey/authenticate/options/` | public | none | yes | yes |
 | POST | `/api/v1/auth/passkey/authenticate/complete/` | public | none | yes | yes |
+| GET | `/api/v1/health/` | public | none | yes | yes |
 | POST | `/api/v1/auth/logout/` | authenticated | authenticated user | no | yes |
 | POST | `/api/v1/auth/password/change/` | authenticated | authenticated user | no | yes |
 | PATCH | `/api/v1/auth/username/` | authenticated | authenticated user | no | yes |
@@ -95,3 +96,25 @@ their documentation visibility.
   including `PATCH /api/v1/auth/username/`.
 - `docs/api/openapi-internal.yaml` includes the username-change endpoint and the
   internal `x-deprecations` metadata extension.
+
+## Application Health Endpoint Notes
+
+- `GET /api/v1/health/` is a public route intended for monitoring systems and
+  frontend startup checks.
+- The endpoint accepts requests with or without credentials and returns the
+  same machine-readable payload shape either way.
+- Healthy responses return HTTP `200` with `{"status":"healthy"}`.
+- Non-healthy responses return HTTP `503` with `{"status":"unhealthy"}`.
+- The endpoint reports only application-process health; database, cache, third-
+  party API, and other external dependency checks are out of scope.
+- External dependency failures alone do not change the reported health status
+  while the application process can still handle requests normally.
+- Response bodies stay status-only and do not expose dependency names,
+  diagnostics, or internal failure details.
+- The committed `docs/api/openapi-public.yaml` and
+  `docs/api/openapi-internal.yaml` artifacts both publish the same status-only
+  contract for `/api/v1/health/`.
+- Each request emits one structured `health_check_evaluated` event with the
+  outcome, HTTP status, request method, path, and nullable request user ID.
+- The endpoint appears in both `docs/api/openapi-public.yaml` and
+  `docs/api/openapi-internal.yaml`.

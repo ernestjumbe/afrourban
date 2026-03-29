@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     "rest_framework_simplejwt",
     "rest_framework_simplejwt.token_blacklist",
     # Local apps
+    "health",
     "users",
     "profiles",
 ]
@@ -226,6 +227,11 @@ LOGGING = {
             "propagate": False,
         },
         "profiles": {
+            "handlers": ["console"],
+            "level": "DEBUG",
+            "propagate": False,
+        },
+        "health": {
             "handlers": ["console"],
             "level": "DEBUG",
             "propagate": False,
