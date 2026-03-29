@@ -10,6 +10,7 @@ from typing import Any, Mapping
 
 from drf_spectacular.generators import SchemaGenerator
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
+from rest_framework.authentication import SessionAuthentication
 from rest_framework.permissions import AllowAny, IsAuthenticated
 
 from afrourban.api_governance import (
@@ -159,6 +160,7 @@ class InternalSchemaAPIView(SpectacularAPIView):
     """Serve internal OpenAPI schema (all active endpoints)."""
 
     generator_class = InternalSchemaGenerator
+    authentication_classes = [SessionAuthentication]
     permission_classes = [IsAuthenticated]
     serve_public = True
     custom_settings = {
@@ -177,4 +179,5 @@ class PublicSchemaSwaggerView(SpectacularSwaggerView):
 class InternalSchemaSwaggerView(SpectacularSwaggerView):
     """Serve internal Swagger UI for authenticated users only."""
 
+    authentication_classes = [SessionAuthentication]
     permission_classes = [IsAuthenticated]

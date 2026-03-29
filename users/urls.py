@@ -31,6 +31,7 @@ from users.views import (
     ResendVerificationEmailView,
     TokenRefreshView,
     TokenVerifyView,
+    UsernameChangeView,
     VerifyEmailView,
 )
 
@@ -92,6 +93,7 @@ public_auth_urlpatterns: list = [
 authenticated_auth_urlpatterns: list = [
     path("logout/", LogoutView.as_view(), name="logout"),
     path("password/change/", PasswordChangeView.as_view(), name="password_change"),
+    path("username/", UsernameChangeView.as_view(), name="username_change"),
     # Passkey add to existing account
     path(
         "passkey/add/options/",
@@ -146,9 +148,17 @@ admin_urlpatterns: list = [
     ),
 ]
 
-api_v1_urlpatterns: list = [
+api_v1_auth_urlpatterns: list = [
     path("auth/", include((auth_urlpatterns, "auth"))),
+]
+
+api_v1_admin_urlpatterns: list = [
     path("admin/users/", include((admin_urlpatterns, "admin-users"))),
+]
+
+api_v1_urlpatterns: list = [
+    *api_v1_auth_urlpatterns,
+    *api_v1_admin_urlpatterns,
 ]
 
 # Canonical versioned routes for module-level includes.

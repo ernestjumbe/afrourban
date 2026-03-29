@@ -895,6 +895,16 @@ components:
         user_count:
           type: integer
           readOnly: true
+    PatchedUsernameChangeInput:
+      type: object
+      description: Input serializer for authenticated username changes.
+      properties:
+        username:
+          type: string
+          description: New account username. Must be 3-30 characters, contain at least
+            one letter, not start with '.', and use only letters, numbers, '_' or
+            '.'.
+          maxLength: 30
     Permission:
       type: object
       description: Serializer for permission data.
@@ -1059,14 +1069,18 @@ components:
       description: |-
         Public profile output serializer.
 
-        Limited fields for viewing other users' profiles.
+        Limited fields for viewing user profiles.
         Used for GET /api/profiles/{user_id}/.
 
-        Note: date_of_birth is NOT included (privacy compliance FR-013).
-        Only age and age_verified are exposed.
+        Email is included only when the profile is owned by the requester.
+        Date of birth is not included; only age and age_verified are exposed.
       properties:
         user_id:
           type: integer
+          readOnly: true
+        email:
+          type: string
+          format: email
           readOnly: true
         display_name:
           type: string
@@ -1104,14 +1118,15 @@ components:
       - bio
       - created_at
       - display_name
+      - email
       - user_id
     RegisterInput:
       type: object
       description: |-
         Input serializer for user registration.
 
-        Validates registration data including email uniqueness
-        and password confirmation matching.
+        Validates registration data including email uniqueness,
+        username requirements, and password confirmation matching.
       properties:
         email:
           type: string
@@ -1127,6 +1142,12 @@ components:
           type: string
           writeOnly: true
           description: Password confirmation (must match password)
+        username:
+          type: string
+          description: Required account username. Must be 3-30 characters, contain
+            at least one letter, not start with '.', and use only letters, numbers,
+            '_' or '.'.
+          maxLength: 30
         display_name:
           type: string
           description: Optional public display name
@@ -1135,6 +1156,7 @@ components:
       - email
       - password
       - password_confirm
+      - username
     ResendVerificationEmailInput:
       type: object
       description: Input serializer for resending a verification email.
@@ -1240,6 +1262,28 @@ components:
       - id
       - is_active
       - message
+    UsernameChangeOutput:
+      type: object
+      description: Output serializer for successful username changes.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        username:
+          type: string
+          readOnly: true
+        cooldown_days:
+          type: integer
+          readOnly: true
+        next_allowed_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - cooldown_days
+      - id
+      - next_allowed_at
+      - username
     VerifyEmailInput:
       type: object
       description: Input serializer for email verification.

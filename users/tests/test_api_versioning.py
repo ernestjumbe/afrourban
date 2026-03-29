@@ -29,6 +29,7 @@ def _call(client: APIClient, method: str, path: str):
         ("POST", "/api/v1/auth/token/refresh/"),
         ("POST", "/api/v1/auth/token/verify/"),
         ("POST", "/api/v1/auth/logout/"),
+        ("PATCH", "/api/v1/auth/username/"),
         ("POST", "/api/v1/auth/email-verification/verify/"),
         ("POST", "/api/v1/auth/email-verification/resend/"),
         ("POST", "/api/v1/auth/password/reset/"),

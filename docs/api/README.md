@@ -107,6 +107,7 @@ Expected result:
 
 - `docs/api/openapi-public.yaml` excludes authenticated/staff routes.
 - `docs/api/openapi-internal.yaml` includes all active routes and `x-deprecations`.
+- Internal artifacts include `PATCH /api/v1/auth/username/`; public artifacts do not.
 
 ## 5. Quality Gates
 
@@ -123,3 +124,31 @@ If any gate fails:
 1. Record failing command and output.
 2. Document whether failure is pre-existing or introduced by the current change.
 3. Add remediation plan and owner before release.
+
+## 6. Feature 006 Release Checks
+
+Run the feature-specific contract coverage:
+
+```bash
+poetry run pytest \
+  users/tests/test_registration.py \
+  users/tests/test_username_change.py \
+  users/tests/test_api_email_visibility.py \
+  users/tests/test_migrations_username_backfill.py \
+  profiles/tests/test_api_email_visibility.py -q
+```
+
+Expected result:
+
+- Registration requires `username` and preserves email/password login.
+- Username changes obey validation, case-insensitive uniqueness, and cooldown rules.
+- Backfill tests confirm only missing usernames are populated and no
+  `username_changed_at` values are introduced by migration.
+- Non-owned emails remain hidden for non-privileged users while authorized
+  staff/admin flows retain allowed access.
+
+Compatibility check for this release:
+
+- `/api/v1/` remains the canonical namespace.
+- `POST /api/v1/auth/token/` still authenticates with `email` and `password`.
+- No version or endpoint deprecation entry is introduced by feature 006.

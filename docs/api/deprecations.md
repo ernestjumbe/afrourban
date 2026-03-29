@@ -29,6 +29,15 @@ The deprecation registry contains:
 - Default active version: `v1`
 - No version or endpoint currently marked as deprecated
 
+## Feature 006 Compatibility Note
+
+- Release: `006-add-username-privacy` on 2026-03-28
+- Change type: additive contract update within `/api/v1/`
+- `POST /api/v1/auth/token/` remains email/password based
+- `PATCH /api/v1/auth/username/` is a new authenticated endpoint, not a
+  replacement for an existing route
+- This release introduces no new version or endpoint deprecation registry entry
+
 ## Deprecation Workflow
 
 1. Add or update entries in `docs/api/deprecations.yaml`.

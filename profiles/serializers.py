@@ -3,11 +3,36 @@
 from __future__ import annotations
 
 from datetime import date, timedelta
-from typing import Any
+from typing import Any, cast
 
 from rest_framework import serializers
 
 from profiles.models import Profile
+from users.serializers import redact_user_email_in_payload
+
+
+class ProfileEmailVisibilityMixin:
+    """Apply ownership-aware email visibility to profile payloads."""
+
+    email_visibility_allow_staff_non_owned = False
+
+    def _apply_email_visibility(
+        self,
+        *,
+        obj: Profile,
+        payload: dict[str, Any],
+    ) -> dict[str, Any]:
+        serializer_self = cast(serializers.Serializer, self)
+        request = serializer_self.context.get("request")
+        if request is None:
+            return payload
+
+        return redact_user_email_in_payload(
+            payload=payload,
+            viewer=getattr(request, "user", None),
+            subject_user_id=obj.user_id,
+            allow_staff_non_owned=self.email_visibility_allow_staff_non_owned,
+        )
 
 
 class ProfileInputSerializer(serializers.Serializer):
@@ -72,7 +97,7 @@ class ProfileInputSerializer(serializers.Serializer):
         return value
 
 
-class ProfileOutputSerializer(serializers.Serializer):
+class ProfileOutputSerializer(ProfileEmailVisibilityMixin, serializers.Serializer):
     """Full profile output serializer for owner view.
 
     Includes all profile fields plus user email.
@@ -109,18 +134,23 @@ class ProfileOutputSerializer(serializers.Serializer):
             return obj.avatar.url
         return None
 
+    def to_representation(self, instance: Profile) -> dict[str, Any]:
+        payload = super().to_representation(instance)
+        return self._apply_email_visibility(obj=instance, payload=payload)
 
-class ProfilePublicOutputSerializer(serializers.Serializer):
+
+class ProfilePublicOutputSerializer(ProfileEmailVisibilityMixin, serializers.Serializer):
     """Public profile output serializer.
 
-    Limited fields for viewing other users' profiles.
+    Limited fields for viewing user profiles.
     Used for GET /api/profiles/{user_id}/.
 
-    Note: date_of_birth is NOT included (privacy compliance FR-013).
-    Only age and age_verified are exposed.
+    Email is included only when the profile is owned by the requester.
+    Date of birth is not included; only age and age_verified are exposed.
     """
 
     user_id = serializers.IntegerField(source="user.id", read_only=True)
+    email = serializers.EmailField(source="user.email", read_only=True)
     display_name = serializers.CharField(allow_blank=True, read_only=True)
     bio = serializers.CharField(allow_blank=True, read_only=True)
     avatar = serializers.SerializerMethodField()
@@ -143,6 +173,10 @@ class ProfilePublicOutputSerializer(serializers.Serializer):
                 return request.build_absolute_uri(obj.avatar.url)
             return obj.avatar.url
         return None
+
+    def to_representation(self, instance: Profile) -> dict[str, Any]:
+        payload = super().to_representation(instance)
+        return self._apply_email_visibility(obj=instance, payload=payload)
 
 
 class AvatarUploadSerializer(serializers.Serializer):

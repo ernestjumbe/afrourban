@@ -165,6 +165,11 @@ SIMPLE_JWT = {
     "USER_ID_CLAIM": "user_id",
 }
 
+# Users app username-change cooldown (feature 006 placeholder).
+USERS_USERNAME_CHANGE_COOLDOWN_DAYS = int(
+    os.environ.get("USERS_USERNAME_CHANGE_COOLDOWN_DAYS", "7")
+)
+
 # Structlog Configuration
 _debug = os.environ.get("DEBUG", "False").lower() in ("true", "1", "yes")
 

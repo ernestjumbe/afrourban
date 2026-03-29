@@ -3,6 +3,7 @@
 from django.conf import settings
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
 from django.db import models
+from django.db.models.functions import Lower
 from django.utils import timezone
 
 from users.managers import CustomUserManager
@@ -16,16 +17,39 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
 
     Attributes:
         email: Primary login identifier (unique, case-insensitive).
+        username: Account username (required after rollout backfill).
+        username_changed_at: Timestamp of the most recent successful username change.
         is_active: Whether the user account is enabled.
         is_staff: Whether the user can access Django admin.
         date_joined: Timestamp when the account was created.
     """
+
+    # Username metadata for shared validation logic.
+    USERNAME_STORAGE_MAX_LENGTH = 255
+    USERNAME_INPUT_MIN_LENGTH = 3
+    USERNAME_INPUT_MAX_LENGTH = 30
+    USERNAME_INPUT_PATTERN = r"^(?=.{3,30}$)(?!\.)(?=.*[A-Za-z])[A-Za-z0-9_.]+$"
 
     email = models.EmailField(
         "email address",
         max_length=255,
         unique=True,
         db_index=True,
+    )
+    username = models.CharField(
+        "username",
+        max_length=USERNAME_STORAGE_MAX_LENGTH,
+        db_index=True,
+        help_text=(
+            "Account username. User-supplied values must match project username "
+            "rules; legacy rows may be backfilled from email."
+        ),
+    )
+    username_changed_at = models.DateTimeField(
+        "username changed at",
+        blank=True,
+        null=True,
+        help_text="Timestamp when the username was last changed by the user.",
     )
     is_active = models.BooleanField(
         "active",
@@ -57,7 +81,18 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
         verbose_name_plural = "users"
         indexes = [
             models.Index(fields=["email"]),
+            models.Index(fields=["username_changed_at"]),
             models.Index(fields=["is_active", "is_staff"]),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                condition=~models.Q(username=""),
+                name="users_custom_username_non_empty",
+            ),
+            models.UniqueConstraint(
+                Lower("username"),
+                name="users_custom_username_ci_uniq",
+            ),
         ]
 
     def __str__(self) -> str:

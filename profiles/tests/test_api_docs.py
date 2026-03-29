@@ -24,6 +24,7 @@ PUBLIC_EXPECTED_OPERATIONS: dict[str, set[str]] = {
 INTERNAL_ONLY_PATHS = {
     "/api/v1/auth/logout/",
     "/api/v1/auth/password/change/",
+    "/api/v1/auth/username/",
     "/api/v1/auth/passkey/add/options/",
     "/api/v1/auth/passkey/add/complete/",
     "/api/v1/auth/passkey/",

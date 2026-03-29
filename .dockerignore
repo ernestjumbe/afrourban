@@ -36,6 +36,4 @@ static_root/
 Thumbs.db
 specs/
 README.md
-Makefile
 docker-compose*.yml
-compose/

@@ -17,12 +17,11 @@ python manage.py collectstatic --ignore ts --ignore debug_toolbar --ignore djang
 TMPFILE=$(mktemp) || { echo "Failed to create temp file"; exit 1; }
 
 set +e
-if [ "$DJANGO_SUPERUSER_USERNAME" ]
+if [ "$DJANGO_SUPERUSER_EMAIL" ]
 then
     >&2 echo 'Creating superuser'
     python manage.py createsuperuser \
         --noinput \
-        --username $DJANGO_SUPERUSER_USERNAME \
         --email $DJANGO_SUPERUSER_EMAIL 2> $TMPFILE
         EXIT_CODE=$?
         set -e
@@ -35,7 +34,7 @@ if [[ $EXIT_CODE -ne 0 ]]; then
     # Check if the error matches the specific message
     if grep -q "CommandError: Error: That username is already taken." "$TMPFILE"; then
         echo "Warning: Username already taken. Continuing script..."
-    elif grep -q "CommandError: Error: That email is already taken." "$TMPFILE"; then
+    elif grep -q "CommandError: Error: That email address is already taken." "$TMPFILE"; then
         echo "Warning: Email address already taken. Continuing script..."
     else
         # Display unexpected error and exit

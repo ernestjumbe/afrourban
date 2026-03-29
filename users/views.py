@@ -2,7 +2,9 @@
 
 from typing import Any
 
+import structlog
 from django.contrib.auth import get_user_model
+from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -48,6 +50,8 @@ from users.serializers import (
     RoleDetailSerializer,
     RoleListSerializer,
     RoleUpdateInputSerializer,
+    UsernameChangeInputSerializer,
+    UsernameChangeOutputSerializer,
     UserActivationOutputSerializer,
     UserOutputSerializer,
     VerifyEmailInputSerializer,
@@ -55,10 +59,14 @@ from users.serializers import (
 from users.services import (
     email_verification_resend,
     email_verification_verify,
+    log_email_visibility_outcome,
+    log_username_cooldown_outcome,
+    log_username_outcome,
     role_create,
     role_delete,
     role_update,
     user_activate,
+    username_change,
     user_create,
     user_deactivate,
     user_permissions_set,
@@ -66,6 +74,100 @@ from users.services import (
 )
 
 User = get_user_model()
+logger = structlog.get_logger(__name__)
+
+
+def log_username_api_outcome(
+    *,
+    request: Request,
+    outcome: str,
+    username: str | None = None,
+    user_id: int | None = None,
+    reason: str | None = None,
+) -> None:
+    """Log API-layer username outcomes with request context."""
+
+    request_user_id = getattr(request.user, "pk", None)
+    effective_user_id = user_id if user_id is not None else request_user_id
+
+    log_username_outcome(
+        outcome=outcome,
+        username=username,
+        user_id=effective_user_id,
+        reason=reason,
+    )
+    logger.info(
+        "username_api_outcome",
+        outcome=outcome,
+        username=username,
+        user_id=effective_user_id,
+        method=request.method,
+        path=request.path,
+    )
+
+
+def log_username_cooldown_api_outcome(
+    *,
+    request: Request,
+    outcome: str,
+    cooldown_days: int | None = None,
+    next_allowed_at: Any | None = None,
+) -> None:
+    """Log API-layer username cooldown outcomes with request context."""
+
+    request_user_id = getattr(request.user, "pk", None)
+    username_changed_at = getattr(request.user, "username_changed_at", None)
+
+    log_username_cooldown_outcome(
+        outcome=outcome,
+        user_id=request_user_id,
+        cooldown_days=cooldown_days,
+        username_changed_at=username_changed_at,
+        next_allowed_at=next_allowed_at,
+    )
+    logger.info(
+        "username_cooldown_api_outcome",
+        outcome=outcome,
+        user_id=request_user_id,
+        cooldown_days=cooldown_days,
+        next_allowed_at=next_allowed_at,
+        method=request.method,
+        path=request.path,
+    )
+
+
+def log_email_visibility_api_outcome(
+    *,
+    request: Request,
+    outcome: str,
+    subject_user_id: int | None,
+    is_owned: bool,
+    email_visible: bool,
+) -> None:
+    """Log API-layer email-visibility outcomes with request context."""
+
+    request_user_id = getattr(request.user, "pk", None)
+    request_user_is_staff = bool(getattr(request.user, "is_staff", False))
+
+    log_email_visibility_outcome(
+        outcome=outcome,
+        viewer_user_id=request_user_id,
+        subject_user_id=subject_user_id,
+        viewer_is_staff=request_user_is_staff,
+        is_owned=is_owned,
+        email_visible=email_visible,
+        source="users.views",
+    )
+    logger.info(
+        "email_visibility_api_outcome",
+        outcome=outcome,
+        viewer_user_id=request_user_id,
+        subject_user_id=subject_user_id,
+        is_owned=is_owned,
+        email_visible=email_visible,
+        method=request.method,
+        path=request.path,
+    )
 
 
 class RegisterView(APIView):
@@ -93,10 +195,17 @@ class RegisterView(APIView):
         user = user_create(
             email=serializer.validated_data["email"],
             password=serializer.validated_data["password"],
+            username=serializer.validated_data["username"],
             display_name=serializer.validated_data.get("display_name", ""),
         )
 
-        output_serializer = UserOutputSerializer(user)
+        output_serializer = UserOutputSerializer(
+            user,
+            context={
+                "request": request,
+                "email_visibility_viewer": user,
+            },
+        )
         return Response(output_serializer.data, status=status.HTTP_201_CREATED)
 
 
@@ -267,7 +376,11 @@ class AdminUserListView(APIView):
         if page > 1:
             prev_url = f"{base_url}?page={page - 1}&page_size={page_size}"
 
-        serializer = AdminUserListSerializer(users, many=True)
+        serializer = AdminUserListSerializer(
+            users,
+            many=True,
+            context={"request": request},
+        )
         return Response(
             {
                 "count": count,
@@ -371,7 +484,8 @@ class AdminUserActivateView(APIView):
                 "email": activated_user.email,
                 "is_active": activated_user.is_active,
                 "message": "User account activated successfully.",
-            }
+            },
+            context={"request": request},
         )
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -411,7 +525,8 @@ class AdminUserDeactivateView(APIView):
                 "email": deactivated_user.email,
                 "is_active": deactivated_user.is_active,
                 "message": "User account deactivated successfully.",
-            }
+            },
+            context={"request": request},
         )
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -765,6 +880,48 @@ class PasswordChangeView(APIView):
             {"detail": "Password has been changed successfully."},
             status=status.HTTP_200_OK,
         )
+
+
+class UsernameChangeView(APIView):
+    """API view for authenticated username changes.
+
+    PATCH /api/v1/auth/username/
+    Changes the authenticated user's username when cooldown allows it.
+    """
+
+    permission_classes = [IsAuthenticated]
+    serializer_class = UsernameChangeInputSerializer
+
+    @extend_schema(
+        request=UsernameChangeInputSerializer,
+        responses={status.HTTP_200_OK: UsernameChangeOutputSerializer},
+    )
+    def patch(self, request: Request) -> Response:
+        """Change the authenticated user's username."""
+
+        input_serializer = UsernameChangeInputSerializer(data=request.data)
+        input_serializer.is_valid(raise_exception=True)
+
+        result = username_change(
+            user=request.user,
+            username=input_serializer.validated_data["username"],
+        )
+
+        log_username_api_outcome(
+            request=request,
+            outcome="success",
+            username=str(result["username"]),
+            user_id=int(result["id"]),
+        )
+        log_username_cooldown_api_outcome(
+            request=request,
+            outcome="cooldown_started",
+            cooldown_days=int(result["cooldown_days"]),
+            next_allowed_at=result["next_allowed_at"],
+        )
+
+        output_serializer = UsernameChangeOutputSerializer(result)
+        return Response(output_serializer.data, status=status.HTTP_200_OK)
 
 
 # =============================================================================

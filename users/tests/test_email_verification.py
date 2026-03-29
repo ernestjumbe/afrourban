@@ -8,7 +8,11 @@ from django.utils import timezone
 from rest_framework.test import APIClient
 
 from users.models import EmailVerificationToken
-from users.tests.factories import EmailVerificationTokenFactory, UserFactory
+from users.tests.factories import (
+    EmailVerificationTokenFactory,
+    UserFactory,
+    registration_payload,
+)
 
 
 @pytest.mark.django_db
@@ -19,11 +23,11 @@ class TestRegisterSendsVerificationEmail:
         client = APIClient()
         response = client.post(
             "/api/v1/auth/register/",
-            {
-                "email": "new@example.com",
-                "password": "StrongPass123!",
-                "password_confirm": "StrongPass123!",
-            },
+            registration_payload(
+                email="new@example.com",
+                password="StrongPass123!",
+                username="new_user",
+            ),
             format="json",
         )
 
@@ -117,11 +121,11 @@ class TestRegisterSupersedesUnverified:
         client = APIClient()
         response = client.post(
             "/api/v1/auth/register/",
-            {
-                "email": old_email,
-                "password": "NewStrongPass123!",
-                "password_confirm": "NewStrongPass123!",
-            },
+            registration_payload(
+                email=old_email,
+                password="NewStrongPass123!",
+                username="replacement_user",
+            ),
             format="json",
         )
 
