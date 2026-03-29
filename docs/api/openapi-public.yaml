@@ -403,6 +403,31 @@ paths:
                 $ref: '#/components/schemas/TokenVerify'
           description: ''
       x-access-scope: public
+  /api/v1/health/:
+    get:
+      operationId: health_retrieve
+      description: Anonymous health endpoint for monitoring systems and frontend startup
+        checks. Reports only application-process availability and excludes external
+        dependency verification.
+      summary: Application health check
+      tags:
+      - health
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+          description: ''
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+          description: ''
+      x-access-scope: public
 components:
   schemas:
     AdminProfile:
@@ -586,6 +611,16 @@ components:
       required:
       - email
       - password
+    HealthStatus:
+      type: object
+      description: Serializer for the health endpoint response contract.
+      properties:
+        status:
+          allOf:
+          - $ref: '#/components/schemas/StatusEnum'
+          readOnly: true
+      required:
+      - status
     Logout:
       type: object
       description: Serializer for logout endpoint.
@@ -1221,6 +1256,14 @@ components:
       - name
       - permission_count
       - user_count
+    StatusEnum:
+      enum:
+      - healthy
+      - unhealthy
+      type: string
+      description: |-
+        * `healthy` - healthy
+        * `unhealthy` - unhealthy
     TokenRefresh:
       type: object
       properties:

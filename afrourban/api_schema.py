@@ -42,6 +42,7 @@ _AUTHENTICATED_AUTH_PREFIXES = (
     "/api/v1/auth/passkey/add/",
     "/api/v1/auth/passkey/",
 )
+_HEALTH_PREFIX = "/api/v1/health/"
 _STAFF_PREFIX = "/api/v1/admin/users/"
 _PROFILES_PREFIX = "/api/v1/profiles/"
 
@@ -57,6 +58,9 @@ def classify_endpoint_scope(path: str) -> str | None:
 
     if path.startswith(DOCS_PREFIX):
         return None
+
+    if path.startswith(_HEALTH_PREFIX):
+        return PUBLIC_SCOPE
 
     if path.startswith(_STAFF_PREFIX):
         return STAFF_SCOPE
