@@ -6,9 +6,10 @@ Following HackSoftware Django Styleguide: services handle write operations.
 from __future__ import annotations
 
 import json
+import re
 import secrets
 import uuid
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
 
 import structlog
@@ -17,7 +18,7 @@ from django.contrib.auth.models import Permission
 from django.contrib.auth.tokens import default_token_generator
 from django.core.cache import cache
 from django.core.mail import send_mail
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.template.loader import render_to_string
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
@@ -35,12 +36,217 @@ if TYPE_CHECKING:
 User = get_user_model()
 logger = structlog.get_logger(__name__)
 
+USERNAME_INPUT_MIN_LENGTH = int(getattr(User, "USERNAME_INPUT_MIN_LENGTH", 3))
+USERNAME_INPUT_MAX_LENGTH = int(getattr(User, "USERNAME_INPUT_MAX_LENGTH", 30))
+USERNAME_INPUT_PATTERN = str(
+    getattr(
+        User,
+        "USERNAME_INPUT_PATTERN",
+        r"^(?=.{3,30}$)(?!\.)(?=.*[A-Za-z])[A-Za-z0-9_.]+$",
+    )
+)
+USERNAME_INPUT_RE = re.compile(USERNAME_INPUT_PATTERN)
+
+
+def normalize_username(*, username: str) -> str:
+    """Normalize username input before validation and persistence."""
+
+    return username.strip()
+
+
+def username_has_valid_format(*, username: str) -> bool:
+    """Check if username matches the agreed format policy."""
+
+    normalized_username = normalize_username(username=username)
+    return bool(USERNAME_INPUT_RE.fullmatch(normalized_username))
+
+
+def validate_username_format(*, username: str) -> str:
+    """Validate username format and return normalized value.
+
+    Raises:
+        ValidationError: If username does not match the supported format.
+    """
+
+    normalized_username = normalize_username(username=username)
+    is_valid = username_has_valid_format(username=normalized_username)
+
+    log_username_outcome(
+        outcome="valid_format" if is_valid else "invalid_format",
+        username=normalized_username,
+    )
+
+    if not is_valid:
+        raise ValidationError(
+            {
+                "username": [
+                    "Username must be 3-30 characters, contain at least one letter, "
+                    "not start with '.', and use only letters, numbers, '_' or '.'."
+                ]
+            }
+        )
+
+    return normalized_username
+
+
+def username_is_taken(*, username: str, exclude_user_id: int | None = None) -> bool:
+    """Check if username is already taken (case-insensitive)."""
+
+    normalized_username = normalize_username(username=username)
+    queryset = User.objects.filter(username__iexact=normalized_username)
+    if exclude_user_id is not None:
+        queryset = queryset.exclude(pk=exclude_user_id)
+
+    is_taken = queryset.exists()
+    log_username_outcome(
+        outcome="username_taken" if is_taken else "username_available",
+        username=normalized_username,
+        user_id=exclude_user_id,
+    )
+    return is_taken
+
+
+def log_username_outcome(
+    *,
+    outcome: str,
+    username: str | None,
+    user_id: int | None = None,
+    reason: str | None = None,
+) -> None:
+    """Log structured username operation outcomes for observability."""
+
+    logger.info(
+        "username_operation_outcome",
+        outcome=outcome,
+        username=username,
+        user_id=user_id,
+        reason=reason,
+    )
+
+
+def log_username_cooldown_outcome(
+    *,
+    outcome: str,
+    user_id: int | None,
+    cooldown_days: int | None = None,
+    username_changed_at: datetime | None = None,
+    next_allowed_at: datetime | None = None,
+) -> None:
+    """Log structured cooldown evaluation outcomes."""
+
+    logger.info(
+        "username_cooldown_outcome",
+        outcome=outcome,
+        user_id=user_id,
+        cooldown_days=cooldown_days,
+        username_changed_at=username_changed_at,
+        next_allowed_at=next_allowed_at,
+    )
+
+
+def log_email_visibility_outcome(
+    *,
+    outcome: str,
+    viewer_user_id: int | None,
+    subject_user_id: int | None,
+    viewer_is_staff: bool,
+    is_owned: bool,
+    email_visible: bool,
+    source: str = "users",
+) -> None:
+    """Log structured email-visibility projection outcomes."""
+
+    logger.info(
+        "email_visibility_outcome",
+        outcome=outcome,
+        viewer_user_id=viewer_user_id,
+        subject_user_id=subject_user_id,
+        viewer_is_staff=viewer_is_staff,
+        is_owned=is_owned,
+        email_visible=email_visible,
+        source=source,
+    )
+
+
+@transaction.atomic
+def username_change(*, user: "CustomUser", username: str) -> dict[str, object]:
+    """Change a user's username when cooldown and uniqueness rules allow it."""
+
+    normalized_username = validate_username_format(username=username)
+    cooldown_days = app_settings.USERNAME_CHANGE_COOLDOWN_DAYS
+    now = timezone.now()
+    current_username_changed_at = user.username_changed_at
+
+    if current_username_changed_at is not None:
+        next_allowed_at = current_username_changed_at + timedelta(days=cooldown_days)
+        if now < next_allowed_at:
+            log_username_outcome(
+                outcome="cooldown_active",
+                username=normalized_username,
+                user_id=user.pk,
+                reason="cooldown_active",
+            )
+            log_username_cooldown_outcome(
+                outcome="cooldown_active",
+                user_id=user.pk,
+                cooldown_days=cooldown_days,
+                username_changed_at=current_username_changed_at,
+                next_allowed_at=next_allowed_at,
+            )
+            raise ValidationError(
+                detail=(
+                    "Username can be changed again at "
+                    f"{next_allowed_at.isoformat()}."
+                ),
+                code="cooldown_active",
+            )
+
+    if username_is_taken(username=normalized_username, exclude_user_id=user.pk):
+        raise ValidationError({"username": ["This username is already in use."]})
+
+    user.username = normalized_username
+    user.username_changed_at = now
+
+    try:
+        user.save(update_fields=["username", "username_changed_at"])
+    except IntegrityError as exc:
+        log_username_outcome(
+            outcome="username_taken",
+            username=normalized_username,
+            user_id=user.pk,
+            reason="integrity_error",
+        )
+        raise ValidationError({"username": ["This username is already in use."]}) from exc
+
+    next_allowed_at = now + timedelta(days=cooldown_days)
+
+    log_username_outcome(
+        outcome="success",
+        username=user.username,
+        user_id=user.pk,
+    )
+    log_username_cooldown_outcome(
+        outcome="cooldown_started",
+        user_id=user.pk,
+        cooldown_days=cooldown_days,
+        username_changed_at=user.username_changed_at,
+        next_allowed_at=next_allowed_at,
+    )
+
+    return {
+        "id": user.pk,
+        "username": user.username,
+        "cooldown_days": cooldown_days,
+        "next_allowed_at": next_allowed_at,
+    }
+
 
 @transaction.atomic
 def user_create(
     *,
     email: str,
     password: str,
+    username: str,
     display_name: str = "",
 ) -> "CustomUser":
     """Create a new user with an associated profile.
@@ -53,6 +259,7 @@ def user_create(
     Args:
         email: User's email address (used as login identifier).
         password: User's password (will be hashed).
+        username: Account username supplied during registration.
         display_name: Optional public display name for the profile.
 
     Returns:
@@ -61,10 +268,23 @@ def user_create(
     Raises:
         IntegrityError: If a *verified* email already exists.
     """
+    normalized_username = validate_username_format(username=username)
+
     # Supersede any existing unverified account (CASCADE deletes token)
     existing_unverified = User.objects.filter(
         email__iexact=email, is_email_verified=False
     )
+
+    existing_unverified_user = existing_unverified.only("id").first()
+    exclude_user_id = (
+        existing_unverified_user.pk if existing_unverified_user is not None else None
+    )
+    if username_is_taken(
+        username=normalized_username,
+        exclude_user_id=exclude_user_id,
+    ):
+        raise ValidationError({"username": ["This username is already in use."]})
+
     if existing_unverified.exists():
         logger.info("email_verification_superseded", email=email)
         existing_unverified.delete()
@@ -72,6 +292,7 @@ def user_create(
     user = User.objects.create_user(
         email=email,
         password=password,
+        username=normalized_username,
     )
 
     Profile.objects.create(
@@ -83,6 +304,7 @@ def user_create(
         "user_created",
         user_id=user.id,
         email=user.email,
+        username=user.username,
     )
 
     # Create verification token and send email
@@ -761,7 +983,11 @@ def passkey_register_complete(
         existing_unverified.delete()
 
     # Create user with no password (passkey-only)
-    user = User.objects.create_user(email=email, password=None)
+    user = User.objects.create_user(
+        email=email,
+        password=None,
+        username=email,
+    )
 
     Profile.objects.create(user=user, display_name=display_name)
 

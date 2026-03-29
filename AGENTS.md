@@ -3,6 +3,8 @@
 Auto-generated from all feature plans. Last updated: 2026-03-28
 
 ## Active Technologies
+- Python 3.11 (project constraint `^3.11`) + Django 5.1.2, Django REST Framework, SimpleJWT, drf-spectacular, structlog (006-add-username-privacy)
+- Django ORM on PostgreSQL (production) / SQLite (dev+test), with new user-field migration (006-add-username-privacy)
 
 - Python 3.11 + Django 5.1.2, Django REST Framework, SimpleJWT, drf-spectacular, structlog (005-api-url-versioning-docs)
 
@@ -22,6 +24,7 @@ cd src [ONLY COMMANDS FOR ACTIVE TECHNOLOGIES][ONLY COMMANDS FOR ACTIVE TECHNOLO
 Python 3.11: Follow standard conventions
 
 ## Recent Changes
+- 006-add-username-privacy: Added Python 3.11 (project constraint `^3.11`) + Django 5.1.2, Django REST Framework, SimpleJWT, drf-spectacular, structlog
 
 - 005-api-url-versioning-docs: Added Python 3.11 + Django 5.1.2, Django REST Framework, SimpleJWT, drf-spectacular, structlog
 

@@ -14,16 +14,152 @@ from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from users.claims import build_token_claims, get_age_verification, get_user_policies
+from users.services import (
+    log_email_visibility_outcome,
+    username_is_taken,
+    validate_username_format,
+)
 
 User = get_user_model()
 logger = structlog.get_logger(__name__)
 
 
+def _viewer_id(*, viewer: Any) -> int | None:
+    return cast(int | None, getattr(viewer, "pk", None))
+
+
+def is_user_object_owned(*, viewer: Any, subject_user_id: int | None) -> bool:
+    """Return True when viewer owns the serialized user object."""
+
+    viewer_user_id = _viewer_id(viewer=viewer)
+    return (
+        viewer_user_id is not None
+        and subject_user_id is not None
+        and viewer_user_id == subject_user_id
+    )
+
+
+def can_view_user_email(
+    *,
+    viewer: Any,
+    subject_user_id: int | None,
+    allow_staff_non_owned: bool = True,
+) -> bool:
+    """Return True when email should be visible for this viewer/subject pair."""
+
+    owned = is_user_object_owned(viewer=viewer, subject_user_id=subject_user_id)
+    if owned:
+        return True
+
+    viewer_is_staff = bool(getattr(viewer, "is_staff", False))
+    viewer_is_superuser = bool(getattr(viewer, "is_superuser", False))
+    return allow_staff_non_owned and (viewer_is_staff or viewer_is_superuser)
+
+
+def project_user_email_for_viewer(
+    *,
+    email: str,
+    viewer: Any,
+    subject_user_id: int | None,
+    allow_staff_non_owned: bool = True,
+) -> str | None:
+    """Return email when visible for the viewer, otherwise None."""
+
+    owned = is_user_object_owned(viewer=viewer, subject_user_id=subject_user_id)
+    viewer_is_staff = bool(getattr(viewer, "is_staff", False))
+    email_visible = can_view_user_email(
+        viewer=viewer,
+        subject_user_id=subject_user_id,
+        allow_staff_non_owned=allow_staff_non_owned,
+    )
+
+    log_email_visibility_outcome(
+        outcome="email_visible" if email_visible else "email_redacted",
+        viewer_user_id=_viewer_id(viewer=viewer),
+        subject_user_id=subject_user_id,
+        viewer_is_staff=viewer_is_staff,
+        is_owned=owned,
+        email_visible=email_visible,
+        source="users.serializers",
+    )
+
+    return email if email_visible else None
+
+
+def redact_user_email_in_payload(
+    *,
+    payload: dict[str, Any],
+    viewer: Any,
+    subject_user_id: int | None,
+    email_key: str = "email",
+    allow_staff_non_owned: bool = True,
+) -> dict[str, Any]:
+    """Apply ownership/role-based email visibility to a serialized payload."""
+
+    if email_key not in payload:
+        return payload
+
+    projected_email = project_user_email_for_viewer(
+        email=cast(str, payload[email_key]),
+        viewer=viewer,
+        subject_user_id=subject_user_id,
+        allow_staff_non_owned=allow_staff_non_owned,
+    )
+
+    if projected_email is not None:
+        return payload
+
+    redacted_payload = dict(payload)
+    redacted_payload.pop(email_key, None)
+    return redacted_payload
+
+
+class EmailVisibilitySerializerMixin:
+    """Apply ownership-aware email redaction to serializer payloads."""
+
+    email_visibility_allow_staff_non_owned = False
+    email_visibility_email_key = "email"
+
+    def _email_visibility_subject_user_id(self, instance: Any) -> int | None:
+        subject_user_id = cast(int | None, getattr(instance, "pk", None))
+        if subject_user_id is not None:
+            return subject_user_id
+
+        subject_user_id = cast(int | None, getattr(instance, "user_id", None))
+        if subject_user_id is not None:
+            return subject_user_id
+
+        subject_user = getattr(instance, "user", None)
+        return cast(int | None, getattr(subject_user, "pk", None))
+
+    def to_representation(self, instance: Any) -> dict[str, Any]:
+        serializer_self = cast(serializers.Serializer, self)
+        payload = cast(
+            dict[str, Any],
+            serializers.Serializer.to_representation(serializer_self, instance),
+        )
+        request = serializer_self.context.get("request")
+        viewer = serializer_self.context.get("email_visibility_viewer")
+        if viewer is None and request is not None:
+            viewer = getattr(request, "user", None)
+
+        if viewer is None:
+            return payload
+
+        return redact_user_email_in_payload(
+            payload=payload,
+            viewer=viewer,
+            subject_user_id=self._email_visibility_subject_user_id(instance),
+            email_key=self.email_visibility_email_key,
+            allow_staff_non_owned=self.email_visibility_allow_staff_non_owned,
+        )
+
+
 class RegisterInputSerializer(serializers.Serializer):
     """Input serializer for user registration.
 
-    Validates registration data including email uniqueness
-    and password confirmation matching.
+    Validates registration data including email uniqueness,
+    username requirements, and password confirmation matching.
     """
 
     email = serializers.EmailField(
@@ -40,6 +176,14 @@ class RegisterInputSerializer(serializers.Serializer):
         write_only=True,
         style={"input_type": "password"},
         help_text="Password confirmation (must match password)",
+    )
+    username = serializers.CharField(
+        max_length=User.USERNAME_INPUT_MAX_LENGTH,
+        help_text=(
+            "Required account username. Must be 3-30 characters, contain at least "
+            "one letter, not start with '.', and use only letters, numbers, '_' "
+            "or '.'."
+        ),
     )
     display_name = serializers.CharField(
         max_length=100,
@@ -64,11 +208,30 @@ class RegisterInputSerializer(serializers.Serializer):
         return value
 
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
-        """Validate passwords match."""
+        """Validate passwords match and username is available."""
         if attrs.get("password") != attrs.get("password_confirm"):
             raise serializers.ValidationError(
                 {"password_confirm": "Passwords do not match."}
             )
+
+        username = validate_username_format(username=attrs["username"])
+        existing_unverified = User.objects.filter(
+            email__iexact=attrs["email"],
+            is_email_verified=False,
+        ).only("id")
+        existing_unverified_user = existing_unverified.first()
+        exclude_user_id = (
+            existing_unverified_user.pk
+            if existing_unverified_user is not None
+            else None
+        )
+
+        if username_is_taken(username=username, exclude_user_id=exclude_user_id):
+            raise serializers.ValidationError(
+                {"username": ["This username is already in use."]}
+            )
+
+        attrs["username"] = username
         return attrs
 
 
@@ -91,7 +254,7 @@ class ProfileOutputSerializer(serializers.Serializer):
     avatar = serializers.ImageField(allow_null=True)
 
 
-class UserOutputSerializer(serializers.Serializer):
+class UserOutputSerializer(EmailVisibilitySerializerMixin, serializers.Serializer):
     """Output serializer for user data after registration.
 
     Returns user info along with nested profile data.
@@ -110,7 +273,7 @@ class UserPoliciesSerializer(serializers.Serializer):
     permissions = serializers.ListField(child=serializers.CharField())
 
 
-class TokenUserSerializer(serializers.Serializer):
+class TokenUserSerializer(EmailVisibilitySerializerMixin, serializers.Serializer):
     """Serializer for user data in token response."""
 
     id = serializers.IntegerField(read_only=True)
@@ -216,11 +379,13 @@ class RoleSerializer(serializers.Serializer):
     name = serializers.CharField(read_only=True)
 
 
-class AdminUserListSerializer(serializers.Serializer):
+class AdminUserListSerializer(EmailVisibilitySerializerMixin, serializers.Serializer):
     """Serializer for user list in admin view.
 
     Returns minimal user data for list display.
     """
+
+    email_visibility_allow_staff_non_owned = True
 
     id = serializers.IntegerField(read_only=True)
     email = serializers.EmailField(read_only=True)
@@ -277,11 +442,13 @@ class PolicySerializer(serializers.Serializer):
     name = serializers.CharField(read_only=True)
 
 
-class AdminUserDetailSerializer(serializers.Serializer):
+class AdminUserDetailSerializer(EmailVisibilitySerializerMixin, serializers.Serializer):
     """Serializer for user detail in admin view.
 
     Returns full user data including profile, roles, and permissions.
     """
+
+    email_visibility_allow_staff_non_owned = True
 
     id = serializers.IntegerField(read_only=True)
     email = serializers.EmailField(read_only=True)
@@ -325,8 +492,10 @@ class AdminUserUpdateInputSerializer(serializers.Serializer):
     )
 
 
-class UserActivationOutputSerializer(serializers.Serializer):
+class UserActivationOutputSerializer(EmailVisibilitySerializerMixin, serializers.Serializer):
     """Output serializer for user activation/deactivation."""
+
+    email_visibility_allow_staff_non_owned = True
 
     id = serializers.IntegerField(read_only=True)
     email = serializers.EmailField(read_only=True)
@@ -531,6 +700,28 @@ class PasswordChangeSerializer(serializers.Serializer):
                 {"new_password_confirm": "Passwords do not match."}
             )
         return attrs
+
+
+class UsernameChangeInputSerializer(serializers.Serializer):
+    """Input serializer for authenticated username changes."""
+
+    username = serializers.CharField(
+        max_length=User.USERNAME_INPUT_MAX_LENGTH,
+        help_text=(
+            "New account username. Must be 3-30 characters, contain at least "
+            "one letter, not start with '.', and use only letters, numbers, '_' "
+            "or '.'."
+        ),
+    )
+
+
+class UsernameChangeOutputSerializer(serializers.Serializer):
+    """Output serializer for successful username changes."""
+
+    id = serializers.IntegerField(read_only=True)
+    username = serializers.CharField(read_only=True)
+    cooldown_days = serializers.IntegerField(read_only=True)
+    next_allowed_at = serializers.DateTimeField(read_only=True)
 
 
 # =============================================================================

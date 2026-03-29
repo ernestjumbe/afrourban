@@ -17,9 +17,12 @@ from afrourban.api_schema import (
 from profiles.urls import api_v1_urlpatterns as profiles_api_v1_urlpatterns
 from users.urls import api_v1_urlpatterns as users_api_v1_urlpatterns
 
-api_v1_urlpatterns = [
+api_v1_module_urlpatterns = [
     path("", include((users_api_v1_urlpatterns, "users-v1"))),
     path("profiles/", include((profiles_api_v1_urlpatterns, "profiles-v1"))),
+]
+
+api_v1_docs_urlpatterns = [
     path(
         "docs/public/schema/",
         PublicSchemaAPIView.as_view(),
@@ -40,6 +43,11 @@ api_v1_urlpatterns = [
         InternalSchemaSwaggerView.as_view(url_name="api-schema-internal"),
         name="api-docs-internal",
     ),
+]
+
+api_v1_urlpatterns = [
+    *api_v1_module_urlpatterns,
+    *api_v1_docs_urlpatterns,
 ]
 
 api_urlpatterns = [

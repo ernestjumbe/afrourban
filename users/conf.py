@@ -60,5 +60,15 @@ class _AppSettings:
     def WEBAUTHN_MAX_CREDENTIALS_PER_USER(self) -> int:
         return getattr(settings, "USERS_WEBAUTHN_MAX_CREDENTIALS_PER_USER", 5)
 
+    @property
+    def USERNAME_CHANGE_COOLDOWN_DAYS(self) -> int:
+        raw_value = getattr(settings, "USERS_USERNAME_CHANGE_COOLDOWN_DAYS", 7)
+        try:
+            cooldown_days = int(raw_value)
+        except (TypeError, ValueError):
+            return 7
+
+        return max(cooldown_days, 0)
+
 
 app_settings = _AppSettings()

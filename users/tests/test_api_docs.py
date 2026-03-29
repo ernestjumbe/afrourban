@@ -26,6 +26,7 @@ INTERNAL_EXPECTED_OPERATIONS: dict[str, set[str]] = {
     "/api/v1/auth/passkey/authenticate/complete/": {"post"},
     "/api/v1/auth/logout/": {"post"},
     "/api/v1/auth/password/change/": {"post"},
+    "/api/v1/auth/username/": {"patch"},
     "/api/v1/auth/passkey/add/options/": {"post"},
     "/api/v1/auth/passkey/add/complete/": {"post"},
     "/api/v1/auth/passkey/": {"get"},
