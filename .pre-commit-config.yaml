@@ -1,0 +1,26 @@
+default_stages: [pre-commit]
+
+repos:
+  - repo: local
+    hooks:
+      - id: backend-ruff
+        name: backend-ruff
+        entry: poetry run ruff check .
+        language: system
+        always_run: true
+        pass_filenames: false
+        stages: [pre-commit]
+      - id: backend-mypy
+        name: backend-mypy
+        entry: poetry run mypy .
+        language: system
+        always_run: true
+        pass_filenames: false
+        stages: [pre-commit]
+      - id: backend-pytest
+        name: backend-pytest
+        entry: poetry run pytest
+        language: system
+        always_run: true
+        pass_filenames: false
+        stages: [pre-commit]
