@@ -23,6 +23,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
+# Import secrets
+from .secrets import get_secret, SECRET_KEY
+
 
 # Application definition
 
@@ -236,5 +239,60 @@ LOGGING = {
             "level": "DEBUG",
             "propagate": False,
         },
+    },
+}
+
+# ==============================================================================
+# CACHE CONFIGURATION (Redis)
+# ==============================================================================
+
+import logging
+
+logger = logging.getLogger(__name__)
+
+# Valkey (Redis-compatible) configuration
+# Migration: 001-replace-redis-valkey
+redis_url = get_secret("REDIS_URL", "redis://redis:6379/0")
+logger.info(f"Initializing cache connection to: {redis_url}")
+
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": redis_url,
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+        },
+        "KEY_PREFIX": "afrourban",
+        "TIMEOUT": 300,
+    }
+}
+
+# ==============================================================================
+# CELERY CONFIGURATION
+# ==============================================================================
+
+# Valkey (Redis-compatible) configuration for Celery
+# Migration: 001-replace-redis-valkey
+logger.info(f"Initializing Celery broker and result backend to: {redis_url}")
+
+CELERY_BROKER_URL = redis_url
+CELERY_RESULT_BACKEND = redis_url
+CELERY_ACCEPT_CONTENT = ["json"]
+CELERY_TASK_SERIALIZER = "json"
+CELERY_RESULT_SERIALIZER = "json"
+CELERY_TIMEZONE = "UTC"
+CELERY_TASK_TRACK_STARTED = True
+CELERY_TASK_TIME_LIMIT = 30 * 60  # 30 minutes
+CELERY_RESULT_EXPIRES = 3600  # 1 hour
+
+# Celery Beat Schedule for periodic tasks
+CELERY_BEAT_SCHEDULE = {
+    "expire-suspensions": {
+        "task": "afrourban.apps.moderation.tasks.expire_suspensions",
+        "schedule": 86400.0,  # Run daily (24 hours in seconds)
+    },
+    "execute-scheduled-deletions": {
+        "task": "afrourban.apps.users.tasks.execute_scheduled_deletions",
+        "schedule": 86400.0,  # Run daily (24 hours in seconds)
     },
 }
