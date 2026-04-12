@@ -17,3 +17,47 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+  celery_worker:
+    env_file: env/.env.docker
+    build:
+      context: .
+      target: builder
+      dockerfile: ./compose/local/django/Dockerfile
+    command: celery -A afrourban.celery:app worker -l INFO
+    volumes:
+      - .:/app
+    depends_on:
+      - django
+
+  celery_beat:
+    build:
+      context: .
+      dockerfile: ./compose/local/django/Dockerfile
+    image: afrourban_celery_beat
+    command: /start-celerybeat
+    volumes:
+      - .:/app
+    env_file:
+      - env/.env.docker
+    environment:
+      - DJANGO_SETTINGS_MODULE=afrourban.settings.local
+    depends_on:
+      - django
+      - celery_worker
+
+  flower:
+    restart: unless-stopped
+    env_file: env/.env.docker
+    environment:
+      - DJANGO_SETTINGS_MODULE=afrourban.settings.local
+    build:
+      context: .
+      dockerfile: ./compose/local/django/Dockerfile
+    image: afrourban_celery_flower
+    command: /start-flower
+    volumes:
+      - .:/app
+    ports:
+      - 5557:5555
+    depends_on:
+      - celery_worker

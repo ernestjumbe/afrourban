@@ -115,15 +115,15 @@ COPY --chown=${APP_USER}:${APP_GROUP} . /app
 # Copy and prepare entrypoint scripts
 COPY --chown=${APP_USER}:${APP_GROUP} ./compose/local/django/entrypoint /entrypoint
 COPY --chown=${APP_USER}:${APP_GROUP} ./compose/local/django/start /start
-# COPY --chown=${APP_USER}:${APP_GROUP} ./compose/local/celery/flower/start /start-flower
-# COPY --chown=${APP_USER}:${APP_GROUP} ./compose/local/celery/beat/start /start-celerybeat
+COPY --chown=${APP_USER}:${APP_GROUP} ./compose/local/celery/flower/start /start-flower
+COPY --chown=${APP_USER}:${APP_GROUP} ./compose/local/celery/beat/start /start-celerybeat
 
 # Fix line endings and set permissions
 RUN sed -i 's/\r$//g' /entrypoint \
     && sed -i 's/\r$//g' /start \
-    # && sed -i 's/\r$//g' /start-flower \
-    # && sed -i 's/\r$//g' /start-celerybeat \
-    && chmod +x /entrypoint /start
+    && sed -i 's/\r$//g' /start-flower \
+    && sed -i 's/\r$//g' /start-celerybeat \
+    && chmod +x /entrypoint /start /start-flower /start-celerybeat
 
 # Create necessary directories with proper ownership
 RUN mkdir -p /app/staticfiles /app/mediafiles \
