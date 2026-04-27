@@ -182,3 +182,30 @@ Compatibility check for this release:
 - dependency failures remain outside the health evaluation scope
 - health evaluations emit one structured `health_check_evaluated` event per
   request
+
+## 8. Organization Profiles
+
+Feature 009 adds authenticated organization browsing alongside the owner-only
+create, patch, and branding mutation flows. The organizations surface is
+separate from person profiles and uses `/api/v1/organizations/` for collection,
+detail, and logo/cover endpoints.
+
+Current phase-specific test targets:
+
+```bash
+poetry run pytest \
+  organizations/tests/test_services.py \
+  organizations/tests/test_selectors.py \
+  organizations/tests/test_api_collection.py \
+  organizations/tests/test_api_detail.py \
+  organizations/tests/test_api_branding.py \
+  organizations/tests/test_api_versioning.py \
+  organizations/tests/test_api_docs.py -q
+```
+
+Current verification focus:
+
+- organization create flow and owner assignment
+- owner-only update and branding mutation enforcement
+- authenticated collection/detail browsing with filtering and pagination
+- `/api/v1/organizations/` route registration and internal schema-only coverage
