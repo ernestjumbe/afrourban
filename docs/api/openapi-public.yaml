@@ -630,6 +630,240 @@ components:
           description: The refresh token to blacklist
       required:
       - refresh
+    OrganizationBrandingOutput:
+      type: object
+      description: Output serializer for branding upload responses.
+      properties:
+        asset_url:
+          type: string
+          format: uri
+          readOnly: true
+        message:
+          type: string
+          readOnly: true
+      required:
+      - asset_url
+      - message
+    OrganizationCoverUpload:
+      type: object
+      description: Input serializer for cover-image uploads.
+      properties:
+        cover_image:
+          type: string
+          format: uri
+          description: Organization cover image (JPEG, PNG, or WebP, max 5MB).
+      required:
+      - cover_image
+    OrganizationCreateInput:
+      type: object
+      description: Input serializer for organization create requests.
+      properties:
+        name:
+          type: string
+          description: Public organization name.
+          maxLength: 255
+        description:
+          type: string
+          description: Public organization description or bio.
+        organization_type:
+          allOf:
+          - $ref: '#/components/schemas/OrganizationTypeEnum'
+          description: |-
+            Primary organization category.
+
+            * `restaurant` - Restaurant
+            * `barber` - Barber
+            * `hair_salon` - Hair Salon
+            * `bar` - Bar
+            * `night_club` - Night Club
+            * `event_organizer` - Event Organizer
+            * `dance_crew` - Dance Crew
+            * `online_community` - Online Community
+            * `retail_store` - Retail Store
+            * `other` - Other
+        is_online_only:
+          type: boolean
+          description: Whether the organization operates exclusively online.
+        physical_address:
+          type: string
+          nullable: true
+          description: Physical address when the organization is not online-only.
+      required:
+      - description
+      - is_online_only
+      - name
+      - organization_type
+    OrganizationDetail:
+      type: object
+      description: Output serializer for organization detail and mutation responses.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        owner_id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          readOnly: true
+        description:
+          type: string
+          readOnly: true
+        organization_type:
+          type: string
+          readOnly: true
+        is_online_only:
+          type: boolean
+          readOnly: true
+        physical_address:
+          type: string
+          readOnly: true
+          nullable: true
+        logo_url:
+          type: string
+          nullable: true
+          description: Return the absolute logo URL when available.
+          readOnly: true
+        cover_image_url:
+          type: string
+          nullable: true
+          description: Return the absolute cover-image URL when available.
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - cover_image_url
+      - created_at
+      - description
+      - id
+      - is_online_only
+      - logo_url
+      - name
+      - organization_type
+      - owner_id
+      - physical_address
+      - updated_at
+    OrganizationListResponse:
+      type: object
+      description: Pagination envelope serializer for organization collection responses.
+      properties:
+        count:
+          type: integer
+          readOnly: true
+        next:
+          type: string
+          readOnly: true
+          nullable: true
+        previous:
+          type: string
+          readOnly: true
+          nullable: true
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrganizationSummary'
+          readOnly: true
+      required:
+      - count
+      - next
+      - previous
+      - results
+    OrganizationLogoUpload:
+      type: object
+      description: Input serializer for logo uploads.
+      properties:
+        logo:
+          type: string
+          format: uri
+          description: Organization logo (JPEG, PNG, or WebP, max 5MB).
+      required:
+      - logo
+    OrganizationSummary:
+      type: object
+      description: Output serializer for organization collection and detail payloads.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        owner_id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          readOnly: true
+        description:
+          type: string
+          readOnly: true
+        organization_type:
+          type: string
+          readOnly: true
+        is_online_only:
+          type: boolean
+          readOnly: true
+        physical_address:
+          type: string
+          readOnly: true
+          nullable: true
+        logo_url:
+          type: string
+          nullable: true
+          description: Return the absolute logo URL when available.
+          readOnly: true
+        cover_image_url:
+          type: string
+          nullable: true
+          description: Return the absolute cover-image URL when available.
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - cover_image_url
+      - created_at
+      - description
+      - id
+      - is_online_only
+      - logo_url
+      - name
+      - organization_type
+      - owner_id
+      - physical_address
+      - updated_at
+    OrganizationTypeEnum:
+      enum:
+      - restaurant
+      - barber
+      - hair_salon
+      - bar
+      - night_club
+      - event_organizer
+      - dance_crew
+      - online_community
+      - retail_store
+      - other
+      type: string
+      description: |-
+        * `restaurant` - Restaurant
+        * `barber` - Barber
+        * `hair_salon` - Hair Salon
+        * `bar` - Bar
+        * `night_club` - Night Club
+        * `event_organizer` - Event Organizer
+        * `dance_crew` - Dance Crew
+        * `online_community` - Online Community
+        * `retail_store` - Retail Store
+        * `other` - Other
     PasskeyAddCompleteInput:
       type: object
       description: Input serializer for completing passkey addition.
@@ -842,6 +1076,40 @@ components:
             additionalProperties: {}
           description: Get policies (placeholder for Phase 7).
           readOnly: true
+    PatchedOrganizationUpdateInput:
+      type: object
+      description: Input serializer for organization patch requests.
+      properties:
+        name:
+          type: string
+          description: Updated public organization name.
+          maxLength: 255
+        description:
+          type: string
+          description: Updated public organization description or bio.
+        organization_type:
+          allOf:
+          - $ref: '#/components/schemas/OrganizationTypeEnum'
+          description: |-
+            Updated primary organization category.
+
+            * `restaurant` - Restaurant
+            * `barber` - Barber
+            * `hair_salon` - Hair Salon
+            * `bar` - Bar
+            * `night_club` - Night Club
+            * `event_organizer` - Event Organizer
+            * `dance_crew` - Dance Crew
+            * `online_community` - Online Community
+            * `retail_store` - Retail Store
+            * `other` - Other
+        is_online_only:
+          type: boolean
+          description: Whether the organization operates exclusively online.
+        physical_address:
+          type: string
+          nullable: true
+          description: Updated physical address when the organization is not online-only.
     PatchedProfileOutput:
       type: object
       description: |-

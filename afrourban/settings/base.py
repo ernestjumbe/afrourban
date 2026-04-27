@@ -11,10 +11,13 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 """
 
 import os
+import logging
 from datetime import timedelta
 from pathlib import Path
 
 import structlog
+
+from .secrets import get_secret
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -22,10 +25,6 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
-
-# Import secrets
-from .secrets import get_secret, SECRET_KEY
-
 
 # Application definition
 
@@ -45,6 +44,7 @@ INSTALLED_APPS = [
     "health",
     "users",
     "profiles",
+    "organizations",
 ]
 
 MIDDLEWARE = [
@@ -234,6 +234,11 @@ LOGGING = {
             "level": "DEBUG",
             "propagate": False,
         },
+        "organizations": {
+            "handlers": ["console"],
+            "level": "DEBUG",
+            "propagate": False,
+        },
         "health": {
             "handlers": ["console"],
             "level": "DEBUG",
@@ -245,8 +250,6 @@ LOGGING = {
 # ==============================================================================
 # CACHE CONFIGURATION (Redis)
 # ==============================================================================
-
-import logging
 
 logger = logging.getLogger(__name__)
 

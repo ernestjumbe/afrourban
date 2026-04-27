@@ -118,3 +118,32 @@ their documentation visibility.
   outcome, HTTP status, request method, path, and nullable request user ID.
 - The endpoint appears in both `docs/api/openapi-public.yaml` and
   `docs/api/openapi-internal.yaml`.
+
+## Organization Profiles
+
+- Namespace: `/api/v1/organizations/`
+- Auth scope: all organizations endpoints are authenticated in `v1`
+- Active routes:
+  `GET`/`POST /api/v1/organizations/`,
+  `GET`/`PATCH /api/v1/organizations/{organization_id}/`,
+  `POST`/`DELETE /api/v1/organizations/{organization_id}/logo/`, and
+  `POST`/`DELETE /api/v1/organizations/{organization_id}/cover/`
+- Collection reads return the standard pagination envelope with `count`, `next`,
+  `previous`, and `results`
+- Supported collection query parameters:
+  `owner_scope=all|mine`,
+  `organization_type=<choice>`,
+  `is_online_only=true|false`,
+  `search=<fragment>`,
+  `ordering=name|-name|created_at|-created_at`,
+  `page`,
+  and `page_size` (clamped to `100`)
+- Collection and detail payloads expose organization-only fields:
+  `id`, `owner_id`, `name`, `description`, `organization_type`,
+  `is_online_only`, `physical_address`, `logo_url`, `cover_image_url`,
+  `created_at`, and `updated_at`
+- Online-only organizations always return `physical_address: null`
+- Metadata writes and branding mutations are owner-only; non-owner attempts
+  return `403` Problem Details responses
+- Organizations endpoints appear in the internal schema only and remain absent
+  from the public schema because all reads and writes require authentication

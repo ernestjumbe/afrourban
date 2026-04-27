@@ -1028,6 +1028,270 @@ paths:
                 $ref: '#/components/schemas/HealthStatus'
           description: ''
       x-access-scope: public
+  /api/v1/organizations/:
+    get:
+      operationId: organizations_retrieve
+      description: List organizations with filtering, ordering, and pagination.
+      parameters:
+      - in: query
+        name: is_online_only
+        schema:
+          type: boolean
+        description: Filter by online-only presence mode.
+      - in: query
+        name: ordering
+        schema:
+          type: string
+          default: -created_at
+          minLength: 1
+        description: Requested ordering. Unsupported values fall back to -created_at.
+      - in: query
+        name: organization_type
+        schema:
+          enum:
+          - restaurant
+          - barber
+          - hair_salon
+          - bar
+          - night_club
+          - event_organizer
+          - dance_crew
+          - online_community
+          - retail_store
+          - other
+          - null
+          type: string
+          nullable: true
+          minLength: 1
+        description: |-
+          Filter to one organization type.
+
+          * `restaurant` - Restaurant
+          * `barber` - Barber
+          * `hair_salon` - Hair Salon
+          * `bar` - Bar
+          * `night_club` - Night Club
+          * `event_organizer` - Event Organizer
+          * `dance_crew` - Dance Crew
+          * `online_community` - Online Community
+          * `retail_store` - Retail Store
+          * `other` - Other
+      - in: query
+        name: owner_scope
+        schema:
+          enum:
+          - all
+          - mine
+          type: string
+          default: all
+          minLength: 1
+        description: |-
+          Whether to show all organizations or only the viewer's own.
+
+          * `all` - all
+          * `mine` - mine
+      - in: query
+        name: page
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+        description: Requested page number.
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          minimum: 1
+          default: 20
+        description: Requested page size. Values above 100 are clamped.
+      - in: query
+        name: search
+        schema:
+          type: string
+        description: Case-insensitive search over organization name and description.
+      tags:
+      - organizations
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizationListResponse'
+          description: ''
+      x-access-scope: authenticated
+    post:
+      operationId: organizations_create
+      description: Create a new organization owned by the authenticated user.
+      tags:
+      - organizations
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrganizationCreateInput'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/OrganizationCreateInput'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/OrganizationCreateInput'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizationDetail'
+          description: ''
+      x-access-scope: authenticated
+  /api/v1/organizations/{organization_id}/:
+    get:
+      operationId: organizations_retrieve_2
+      description: Return one organization for any authenticated viewer.
+      parameters:
+      - in: path
+        name: organization_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - organizations
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizationDetail'
+          description: ''
+      x-access-scope: authenticated
+    patch:
+      operationId: organizations_partial_update
+      description: Update organization metadata for the owner.
+      parameters:
+      - in: path
+        name: organization_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - organizations
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedOrganizationUpdateInput'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedOrganizationUpdateInput'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedOrganizationUpdateInput'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizationDetail'
+          description: ''
+      x-access-scope: authenticated
+  /api/v1/organizations/{organization_id}/cover/:
+    post:
+      operationId: organizations_cover_create
+      description: Upload or replace an organization cover image.
+      parameters:
+      - in: path
+        name: organization_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - organizations
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/OrganizationCoverUpload'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizationBrandingOutput'
+          description: ''
+      x-access-scope: authenticated
+    delete:
+      operationId: organizations_cover_destroy
+      description: Delete the organization cover image.
+      parameters:
+      - in: path
+        name: organization_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - organizations
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+      x-access-scope: authenticated
+  /api/v1/organizations/{organization_id}/logo/:
+    post:
+      operationId: organizations_logo_create
+      description: Upload or replace an organization logo.
+      parameters:
+      - in: path
+        name: organization_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - organizations
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/OrganizationLogoUpload'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizationBrandingOutput'
+          description: ''
+      x-access-scope: authenticated
+    delete:
+      operationId: organizations_logo_destroy
+      description: Delete the organization logo.
+      parameters:
+      - in: path
+        name: organization_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - organizations
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+      x-access-scope: authenticated
   /api/v1/profiles/{user_id}/:
     get:
       operationId: profiles_retrieve
@@ -1393,6 +1657,240 @@ components:
           description: The refresh token to blacklist
       required:
       - refresh
+    OrganizationBrandingOutput:
+      type: object
+      description: Output serializer for branding upload responses.
+      properties:
+        asset_url:
+          type: string
+          format: uri
+          readOnly: true
+        message:
+          type: string
+          readOnly: true
+      required:
+      - asset_url
+      - message
+    OrganizationCoverUpload:
+      type: object
+      description: Input serializer for cover-image uploads.
+      properties:
+        cover_image:
+          type: string
+          format: uri
+          description: Organization cover image (JPEG, PNG, or WebP, max 5MB).
+      required:
+      - cover_image
+    OrganizationCreateInput:
+      type: object
+      description: Input serializer for organization create requests.
+      properties:
+        name:
+          type: string
+          description: Public organization name.
+          maxLength: 255
+        description:
+          type: string
+          description: Public organization description or bio.
+        organization_type:
+          allOf:
+          - $ref: '#/components/schemas/OrganizationTypeEnum'
+          description: |-
+            Primary organization category.
+
+            * `restaurant` - Restaurant
+            * `barber` - Barber
+            * `hair_salon` - Hair Salon
+            * `bar` - Bar
+            * `night_club` - Night Club
+            * `event_organizer` - Event Organizer
+            * `dance_crew` - Dance Crew
+            * `online_community` - Online Community
+            * `retail_store` - Retail Store
+            * `other` - Other
+        is_online_only:
+          type: boolean
+          description: Whether the organization operates exclusively online.
+        physical_address:
+          type: string
+          nullable: true
+          description: Physical address when the organization is not online-only.
+      required:
+      - description
+      - is_online_only
+      - name
+      - organization_type
+    OrganizationDetail:
+      type: object
+      description: Output serializer for organization detail and mutation responses.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        owner_id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          readOnly: true
+        description:
+          type: string
+          readOnly: true
+        organization_type:
+          type: string
+          readOnly: true
+        is_online_only:
+          type: boolean
+          readOnly: true
+        physical_address:
+          type: string
+          readOnly: true
+          nullable: true
+        logo_url:
+          type: string
+          nullable: true
+          description: Return the absolute logo URL when available.
+          readOnly: true
+        cover_image_url:
+          type: string
+          nullable: true
+          description: Return the absolute cover-image URL when available.
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - cover_image_url
+      - created_at
+      - description
+      - id
+      - is_online_only
+      - logo_url
+      - name
+      - organization_type
+      - owner_id
+      - physical_address
+      - updated_at
+    OrganizationListResponse:
+      type: object
+      description: Pagination envelope serializer for organization collection responses.
+      properties:
+        count:
+          type: integer
+          readOnly: true
+        next:
+          type: string
+          readOnly: true
+          nullable: true
+        previous:
+          type: string
+          readOnly: true
+          nullable: true
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrganizationSummary'
+          readOnly: true
+      required:
+      - count
+      - next
+      - previous
+      - results
+    OrganizationLogoUpload:
+      type: object
+      description: Input serializer for logo uploads.
+      properties:
+        logo:
+          type: string
+          format: uri
+          description: Organization logo (JPEG, PNG, or WebP, max 5MB).
+      required:
+      - logo
+    OrganizationSummary:
+      type: object
+      description: Output serializer for organization collection and detail payloads.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        owner_id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          readOnly: true
+        description:
+          type: string
+          readOnly: true
+        organization_type:
+          type: string
+          readOnly: true
+        is_online_only:
+          type: boolean
+          readOnly: true
+        physical_address:
+          type: string
+          readOnly: true
+          nullable: true
+        logo_url:
+          type: string
+          nullable: true
+          description: Return the absolute logo URL when available.
+          readOnly: true
+        cover_image_url:
+          type: string
+          nullable: true
+          description: Return the absolute cover-image URL when available.
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - cover_image_url
+      - created_at
+      - description
+      - id
+      - is_online_only
+      - logo_url
+      - name
+      - organization_type
+      - owner_id
+      - physical_address
+      - updated_at
+    OrganizationTypeEnum:
+      enum:
+      - restaurant
+      - barber
+      - hair_salon
+      - bar
+      - night_club
+      - event_organizer
+      - dance_crew
+      - online_community
+      - retail_store
+      - other
+      type: string
+      description: |-
+        * `restaurant` - Restaurant
+        * `barber` - Barber
+        * `hair_salon` - Hair Salon
+        * `bar` - Bar
+        * `night_club` - Night Club
+        * `event_organizer` - Event Organizer
+        * `dance_crew` - Dance Crew
+        * `online_community` - Online Community
+        * `retail_store` - Retail Store
+        * `other` - Other
     PasskeyAddCompleteInput:
       type: object
       description: Input serializer for completing passkey addition.
@@ -1605,6 +2103,40 @@ components:
             additionalProperties: {}
           description: Get policies (placeholder for Phase 7).
           readOnly: true
+    PatchedOrganizationUpdateInput:
+      type: object
+      description: Input serializer for organization patch requests.
+      properties:
+        name:
+          type: string
+          description: Updated public organization name.
+          maxLength: 255
+        description:
+          type: string
+          description: Updated public organization description or bio.
+        organization_type:
+          allOf:
+          - $ref: '#/components/schemas/OrganizationTypeEnum'
+          description: |-
+            Updated primary organization category.
+
+            * `restaurant` - Restaurant
+            * `barber` - Barber
+            * `hair_salon` - Hair Salon
+            * `bar` - Bar
+            * `night_club` - Night Club
+            * `event_organizer` - Event Organizer
+            * `dance_crew` - Dance Crew
+            * `online_community` - Online Community
+            * `retail_store` - Retail Store
+            * `other` - Other
+        is_online_only:
+          type: boolean
+          description: Whether the organization operates exclusively online.
+        physical_address:
+          type: string
+          nullable: true
+          description: Updated physical address when the organization is not online-only.
     PatchedProfileOutput:
       type: object
       description: |-
