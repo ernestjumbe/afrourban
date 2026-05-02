@@ -8,8 +8,9 @@ description: "Task list template for feature implementation"
 **Input**: Design documents from `/specs/[###-feature-name]/`
 **Prerequisites**: plan.md (required), spec.md (required for user stories), research.md, data-model.md, contracts/
 
-**Tests**: Tests are REQUIRED by the constitution. Include unit,
-integration, and contract tests as applicable for each user story.
+**Tests**: Tests are REQUIRED by the constitution. Include pytest,
+Vitest, Playwright, integration, and contract tests as applicable for
+each user story.
 
 **Organization**: Tasks are grouped by user story to enable independent implementation and testing of each story.
 
@@ -22,7 +23,8 @@ integration, and contract tests as applicable for each user story.
 ## Path Conventions
 
 - **Single project**: `src/`, `tests/` at repository root
-- **Web app**: `backend/src/`, `frontend/src/`
+- **Web app**: backend Django apps at repository root, frontend Next.js
+      app at `frontend/src/`
 - **Mobile**: `api/src/`, `ios/src/` or `android/src/`
 - Paths shown below assume single project - adjust based on plan.md structure
 
@@ -75,6 +77,17 @@ Examples of foundational tasks (adjust based on your project):
       `urls.py` and include them under `/api/`
 - [ ] T011 Define deprecation policy format (deprecation date, removal
       date, migration path) for affected API versions
+- [ ] T012 [P] Create `frontend/src/app/` route structure, shared
+      component/layout directories, and `frontend/src/middleware.ts`
+      when frontend work is in scope
+- [ ] T013 [P] Configure Auth.js v5 credentials flow, token refresh,
+      and protected route middleware when frontend work is in scope
+- [ ] T014 [P] Configure Zod environment validation, TypeScript strict
+      mode, ESLint `next/core-web-vitals`, Vitest, Playwright, and
+      standalone Next.js build when frontend work is in scope
+- [ ] T015 [P] Select the matching AfroUrban Design 4 recipe and shared
+      component patterns from `guide/RECIPES.md` and
+      `guide/COMPONENT_GUIDE.md` when frontend work is in scope
 
 **Checkpoint**: Foundation ready - user story implementation can now begin in parallel
 
@@ -90,20 +103,29 @@ Examples of foundational tasks (adjust based on your project):
 
 > **NOTE: Write these tests FIRST, ensure they FAIL before implementation**
 
-- [ ] T012 [P] [US1] Contract test for [endpoint] in tests/contract/test_[name].py
-- [ ] T013 [P] [US1] Integration test for [user journey] in tests/integration/test_[name].py
+- [ ] T016 [P] [US1] Contract test for [endpoint] in tests/contract/test_[name].py
+- [ ] T017 [P] [US1] Integration test for [user journey] in tests/integration/test_[name].py
+- [ ] T018 [P] [US1] Vitest coverage for the affected frontend route,
+      server action, or shared schema in frontend tests when frontend is
+      in scope
 
 ### Implementation for User Story 1
 
-- [ ] T014 [P] [US1] Create [Entity1] model in src/models/[entity1].py
-- [ ] T015 [P] [US1] Create [Entity2] model in src/models/[entity2].py
-- [ ] T016 [US1] Implement [Service] in src/services/[service].py (depends on T014, T015)
-- [ ] T017 [US1] Implement [endpoint/feature] in src/[location]/[file].py
+- [ ] T019 [P] [US1] Create [Entity1] model in src/models/[entity1].py
+- [ ] T020 [P] [US1] Create [Entity2] model in src/models/[entity2].py
+- [ ] T021 [US1] Implement [Service] in src/services/[service].py (depends on T019, T020)
+- [ ] T022 [US1] Implement [endpoint/feature] in src/[location]/[file].py
       under a versioned API path
-- [ ] T018 [US1] Add validation and error handling
-- [ ] T019 [US1] Add logging for user story 1 operations
-- [ ] T020 [US1] Update OpenAPI schema output and deprecation metadata
+- [ ] T023 [US1] Add validation and error handling
+- [ ] T024 [US1] Add logging for user story 1 operations
+- [ ] T025 [US1] Update OpenAPI schema output and deprecation metadata
       (if applicable)
+- [ ] T026 [US1] Implement the required App Router segment, Server
+      Component data fetch, Server Action, or Route Handler in
+      `frontend/src/app/...` when frontend is in scope
+- [ ] T027 [US1] Apply the selected Design 4 recipe, page shell, and
+      documented component patterns for the user-facing UI when frontend
+      is in scope
 
 **Checkpoint**: At this point, User Story 1 should be fully functional and testable independently
 
@@ -117,16 +139,23 @@ Examples of foundational tasks (adjust based on your project):
 
 ### Tests for User Story 2 (required) ⚠️
 
-- [ ] T021 [P] [US2] Contract test for [endpoint] in tests/contract/test_[name].py
-- [ ] T022 [P] [US2] Integration test for [user journey] in tests/integration/test_[name].py
+- [ ] T028 [P] [US2] Contract test for [endpoint] in tests/contract/test_[name].py
+- [ ] T029 [P] [US2] Integration test for [user journey] in tests/integration/test_[name].py
+- [ ] T030 [P] [US2] Vitest or Playwright coverage for the affected
+      frontend flow when frontend is in scope
 
 ### Implementation for User Story 2
 
-- [ ] T023 [P] [US2] Create [Entity] model in src/models/[entity].py
-- [ ] T024 [US2] Implement [Service] in src/services/[service].py
-- [ ] T025 [US2] Implement [endpoint/feature] in src/[location]/[file].py
+- [ ] T031 [P] [US2] Create [Entity] model in src/models/[entity].py
+- [ ] T032 [US2] Implement [Service] in src/services/[service].py
+- [ ] T033 [US2] Implement [endpoint/feature] in src/[location]/[file].py
       under the correct API version namespace
-- [ ] T026 [US2] Integrate with User Story 1 components (if needed)
+- [ ] T034 [US2] Integrate with User Story 1 components (if needed)
+- [ ] T035 [US2] Implement the required App Router route, middleware,
+      or internal API handler in `frontend/src/app/...` when frontend
+      is in scope
+- [ ] T036 [US2] Extend the selected Design 4 recipe and documented UI
+      patterns for the user-facing flow when frontend is in scope
 
 **Checkpoint**: At this point, User Stories 1 AND 2 should both work independently
 
@@ -140,15 +169,22 @@ Examples of foundational tasks (adjust based on your project):
 
 ### Tests for User Story 3 (required) ⚠️
 
-- [ ] T027 [P] [US3] Contract test for [endpoint] in tests/contract/test_[name].py
-- [ ] T028 [P] [US3] Integration test for [user journey] in tests/integration/test_[name].py
+- [ ] T037 [P] [US3] Contract test for [endpoint] in tests/contract/test_[name].py
+- [ ] T038 [P] [US3] Integration test for [user journey] in tests/integration/test_[name].py
+- [ ] T039 [P] [US3] Vitest or Playwright coverage for the affected
+      frontend flow when frontend is in scope
 
 ### Implementation for User Story 3
 
-- [ ] T029 [P] [US3] Create [Entity] model in src/models/[entity].py
-- [ ] T030 [US3] Implement [Service] in src/services/[service].py
-- [ ] T031 [US3] Implement [endpoint/feature] in src/[location]/[file].py
+- [ ] T040 [P] [US3] Create [Entity] model in src/models/[entity].py
+- [ ] T041 [US3] Implement [Service] in src/services/[service].py
+- [ ] T042 [US3] Implement [endpoint/feature] in src/[location]/[file].py
       under the correct API version namespace
+- [ ] T043 [US3] Implement the required App Router route, protected
+      server fetch, or Route Handler in `frontend/src/app/...` when
+      frontend is in scope
+- [ ] T044 [US3] Apply the documented Design 4 visual treatment for the
+      user-facing flow when frontend is in scope
 
 **Checkpoint**: All user stories should now be independently functional
 
@@ -167,6 +203,10 @@ Examples of foundational tasks (adjust based on your project):
 - [ ] TXXX Code cleanup and refactoring
 - [ ] TXXX Performance optimization across all stories
 - [ ] TXXX [P] Additional unit tests in tests/unit/
+- [ ] TXXX [P] Frontend loading/error boundary polish and cache
+      revalidation review in `frontend/src/app/`
+- [ ] TXXX [P] Visual QA against `guide/FRONTEND_DESIGN_SYSTEM.md`,
+      `guide/COMPONENT_GUIDE.md`, and `guide/RECIPES.md`
 - [ ] TXXX Security hardening
 - [ ] TXXX Run quickstart.md validation
 

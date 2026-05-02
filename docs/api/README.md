@@ -209,3 +209,29 @@ Current verification focus:
 - owner-only update and branding mutation enforcement
 - authenticated collection/detail browsing with filtering and pagination
 - `/api/v1/organizations/` route registration and internal schema-only coverage
+
+## 9. Events App
+
+Feature 010 adds authenticated event management for both personal events and
+organization-owned events under `/api/v1/events/`.
+
+Current phase-specific test targets:
+
+```bash
+poetry run pytest \
+  events/tests/test_selectors.py \
+  events/tests/test_services.py \
+  events/tests/test_api_create.py \
+  events/tests/test_api_detail.py \
+  events/tests/test_api_cover.py \
+  events/tests/test_api_versioning.py \
+  events/tests/test_api_docs.py -q
+```
+
+Current verification focus:
+
+- authenticated personal-event creation and organization-owned creation
+- owner-only metadata and cover-image mutation enforcement
+- immutable audit retention for `title`, `start_at`, `end_at`, and `location`
+- organizer-context immutability after creation
+- `/api/v1/events/` route registration and internal schema-only coverage

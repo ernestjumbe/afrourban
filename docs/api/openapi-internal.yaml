@@ -1003,6 +1003,133 @@ paths:
                 $ref: '#/components/schemas/UsernameChangeOutput'
           description: ''
       x-access-scope: authenticated
+  /api/v1/events/:
+    post:
+      operationId: events_create
+      description: Create a new personal or organization-owned event.
+      tags:
+      - events
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EventCreateInput'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/EventCreateInput'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/EventCreateInput'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventDetail'
+          description: ''
+      x-access-scope: authenticated
+  /api/v1/events/{event_id}/:
+    get:
+      operationId: events_retrieve
+      description: Return one event for any authenticated viewer.
+      parameters:
+      - in: path
+        name: event_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - events
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventDetail'
+          description: ''
+      x-access-scope: authenticated
+    patch:
+      operationId: events_partial_update
+      description: Update event metadata for the authorized actor.
+      parameters:
+      - in: path
+        name: event_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - events
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedEventUpdateInput'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedEventUpdateInput'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedEventUpdateInput'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventDetail'
+          description: ''
+      x-access-scope: authenticated
+  /api/v1/events/{event_id}/cover/:
+    post:
+      operationId: events_cover_create
+      description: Upload or replace an event cover image.
+      parameters:
+      - in: path
+        name: event_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - events
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/EventCoverUpload'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventCoverOutput'
+          description: ''
+      x-access-scope: authenticated
+    delete:
+      operationId: events_cover_destroy
+      description: Delete an event cover image.
+      parameters:
+      - in: path
+        name: event_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - events
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+      x-access-scope: authenticated
   /api/v1/health/:
     get:
       operationId: health_retrieve
@@ -1619,6 +1746,26 @@ components:
           description: Profile picture (JPEG, PNG, or WebP, max 5MB)
       required:
       - avatar
+    CategoryEnum:
+      enum:
+      - music
+      - food_drink
+      - arts_culture
+      - community
+      - sports_fitness
+      - business_networking
+      - education_workshop
+      - other
+      type: string
+      description: |-
+        * `music` - Music
+        * `food_drink` - Food & Drink
+        * `arts_culture` - Arts & Culture
+        * `community` - Community
+        * `sports_fitness` - Sports & Fitness
+        * `business_networking` - Business & Networking
+        * `education_workshop` - Education & Workshop
+        * `other` - Other
     CustomTokenObtainPair:
       type: object
       description: |-
@@ -1638,6 +1785,195 @@ components:
       required:
       - email
       - password
+    EventCoverOutput:
+      type: object
+      description: Output serializer for successful event cover mutations.
+      properties:
+        asset_url:
+          type: string
+          format: uri
+          readOnly: true
+        message:
+          type: string
+          readOnly: true
+      required:
+      - asset_url
+      - message
+    EventCoverUpload:
+      type: object
+      description: Input serializer for event cover-image uploads.
+      properties:
+        cover_image:
+          type: string
+          format: uri
+          description: Event cover image (JPEG, PNG, or WebP, max 5MB).
+      required:
+      - cover_image
+    EventCreateInput:
+      type: object
+      description: Input serializer for personal and organization-owned event creates.
+      properties:
+        title:
+          type: string
+          description: Public event title.
+          maxLength: 255
+        description:
+          type: string
+          description: Public event description.
+          maxLength: 1000
+        category:
+          allOf:
+          - $ref: '#/components/schemas/CategoryEnum'
+          default: other
+          description: |-
+            Primary event category. Defaults to other.
+
+            * `music` - Music
+            * `food_drink` - Food & Drink
+            * `arts_culture` - Arts & Culture
+            * `community` - Community
+            * `sports_fitness` - Sports & Fitness
+            * `business_networking` - Business & Networking
+            * `education_workshop` - Education & Workshop
+            * `other` - Other
+        organization_id:
+          type: integer
+          minimum: 1
+          nullable: true
+          description: Optional organization to create the event under.
+        start_at:
+          type: string
+          format: date-time
+          description: Scheduled event start date and time.
+        end_at:
+          type: string
+          format: date-time
+          description: Scheduled event end date and time.
+        location:
+          allOf:
+          - $ref: '#/components/schemas/EventLocationInput'
+          description: Structured event location payload.
+        tickets_url:
+          type: string
+          format: uri
+          nullable: true
+          description: Optional tickets or registration link.
+      required:
+      - description
+      - end_at
+      - location
+      - start_at
+      - title
+    EventDetail:
+      type: object
+      description: Output serializer for event detail and create responses.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        organizer_type:
+          type: string
+          readOnly: true
+        owner_user_id:
+          type: integer
+          readOnly: true
+          nullable: true
+        organization_id:
+          type: integer
+          readOnly: true
+          nullable: true
+        title:
+          type: string
+          readOnly: true
+        description:
+          type: string
+          readOnly: true
+        category:
+          type: string
+          readOnly: true
+        start_at:
+          type: string
+          format: date-time
+          readOnly: true
+        end_at:
+          type: string
+          format: date-time
+          readOnly: true
+        location:
+          type: object
+          additionalProperties:
+            type: string
+            nullable: true
+          description: Return the current event location in contract shape.
+          readOnly: true
+        cover_image_url:
+          type: string
+          nullable: true
+          description: Return the absolute cover-image URL when available.
+          readOnly: true
+        tickets_url:
+          type: string
+          format: uri
+          readOnly: true
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - category
+      - cover_image_url
+      - created_at
+      - description
+      - end_at
+      - id
+      - location
+      - organization_id
+      - organizer_type
+      - owner_user_id
+      - start_at
+      - tickets_url
+      - title
+      - updated_at
+    EventLocationInput:
+      type: object
+      description: Nested input serializer for event location payloads.
+      properties:
+        type:
+          allOf:
+          - $ref: '#/components/schemas/TypeEnum'
+          description: |-
+            Whether the event uses a physical or web location.
+
+            * `physical` - Physical
+            * `web` - Web
+        web_url:
+          type: string
+          format: uri
+          nullable: true
+          description: Web address for online events.
+        country:
+          type: string
+          nullable: true
+          description: Country for physical event locations.
+        state:
+          type: string
+          nullable: true
+          description: State or region for physical event locations.
+        city:
+          type: string
+          nullable: true
+          description: City or town for physical event locations.
+        postcode:
+          type: string
+          nullable: true
+          description: Postcode or zipcode for physical event locations.
+      required:
+      - type
     HealthStatus:
       type: object
       description: Serializer for the health endpoint response contract.
@@ -2103,6 +2439,49 @@ components:
             additionalProperties: {}
           description: Get policies (placeholder for Phase 7).
           readOnly: true
+    PatchedEventUpdateInput:
+      type: object
+      description: Input serializer for event patch requests.
+      properties:
+        title:
+          type: string
+          description: Updated public event title.
+          maxLength: 255
+        description:
+          type: string
+          description: Updated public event description.
+          maxLength: 1000
+        category:
+          allOf:
+          - $ref: '#/components/schemas/CategoryEnum'
+          description: |-
+            Updated primary event category.
+
+            * `music` - Music
+            * `food_drink` - Food & Drink
+            * `arts_culture` - Arts & Culture
+            * `community` - Community
+            * `sports_fitness` - Sports & Fitness
+            * `business_networking` - Business & Networking
+            * `education_workshop` - Education & Workshop
+            * `other` - Other
+        start_at:
+          type: string
+          format: date-time
+          description: Updated event start date and time.
+        end_at:
+          type: string
+          format: date-time
+          description: Updated event end date and time.
+        location:
+          allOf:
+          - $ref: '#/components/schemas/EventLocationInput'
+          description: Updated structured event location payload.
+        tickets_url:
+          type: string
+          format: uri
+          nullable: true
+          description: Updated tickets or registration link.
     PatchedOrganizationUpdateInput:
       type: object
       description: Input serializer for organization patch requests.
@@ -2578,6 +2957,14 @@ components:
           writeOnly: true
       required:
       - token
+    TypeEnum:
+      enum:
+      - physical
+      - web
+      type: string
+      description: |-
+        * `physical` - Physical
+        * `web` - Web
     UserActivationOutput:
       type: object
       description: Output serializer for user activation/deactivation.

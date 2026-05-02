@@ -108,6 +108,46 @@
 - **API-005**: If the feature has no API impact, mark this section as
   `N/A` with a short justification.
 
+### Frontend Architecture & BFF Constraints *(mandatory when frontend is added or changed)*
+
+- **FE-001**: Frontend routes MUST use `frontend/src/app`; Pages Router
+  usage is prohibited.
+- **FE-002**: The spec MUST identify which route segments own their
+  colocated components, logic, and types, and which assets are shared.
+- **FE-003**: The spec MUST default to React Server Components and list
+  any required `'use client'` boundaries with justification.
+- **FE-004**: Client code MUST NOT call external APIs directly; the spec
+  MUST identify the required Server Actions and internal Route Handlers.
+- **FE-005**: Authentication flows MUST use Auth.js v5 Credentials
+  against the Django API, including token storage, refresh, and route
+  protection behavior.
+- **FE-006**: Frontend validation MUST use Zod for environment
+  variables, forms, and external API response parsing.
+- **FE-007**: Frontend quality gates MUST cover TypeScript strict mode,
+  ESLint `next/core-web-vitals`, Vitest, Playwright, and `next build`
+  with `output: 'standalone'`.
+- **FE-008**: If the feature has no frontend impact, mark this section
+  as `N/A` with a short justification.
+
+### UI & Styling Constraints *(mandatory when frontend is added or changed)*
+
+- **UI-001**: The spec MUST identify the closest AfroUrban Design 4
+  page recipe from `guide/RECIPES.md` that the page follows.
+- **UI-002**: The spec MUST identify which documented components or
+  component patterns from `guide/COMPONENT_GUIDE.md` are reused.
+- **UI-003**: The UI MUST preserve the Design 4 visual language:
+  dark-first editorial framing, gold primary action, terracotta
+  category accent, serif narrative headings, uppercase tracked sans UI,
+  and restrained motion.
+- **UI-004**: The spec MUST describe any intentional deviation from the
+  design guides and justify why the closest existing pattern is
+  insufficient.
+- **UI-005**: The feature MUST avoid dashboard density, generic SaaS
+  styling, loud pattern placement behind body copy, and heavy shadow or
+  neon treatments.
+- **UI-006**: If the feature has no frontend impact, mark this section
+  as `N/A` with a short justification.
+
 ### Key Entities *(include if feature involves data)*
 
 - **[Entity 1]**: [What it represents, key attributes without implementation]

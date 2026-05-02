@@ -40,10 +40,26 @@
       `/api/`.
 - [ ] **Deprecation gate**: Any deprecated endpoint/version documents
       deprecation date, planned removal date, and migration path.
+- [ ] **Frontend architecture gate**: Frontend work uses
+      `frontend/src/app`, forbids the Pages Router, and keeps
+      route-local components/logic/types colocated.
+- [ ] **BFF gate**: External APIs are brokered by the Next.js server,
+      with Server Components by default, Server Actions for mutations,
+      and Route Handlers only for internal browser-facing endpoints.
+- [ ] **Auth gate**: Frontend authentication uses Auth.js v5
+      Credentials against the Django API, stores tokens in encrypted
+      session callbacks, refreshes access tokens server-side, and
+      protects routes with middleware.
 - [ ] **Testing gate**: Test-first approach is explicit; failing tests
       are planned before implementation.
 - [ ] **Quality gate**: Plan includes Ruff, mypy, pytest, and API schema
       validation (`manage.py spectacular --validate`) for API changes.
+- [ ] **Frontend quality gate**: Frontend plans include TypeScript
+      strict mode, Zod validation, ESLint `next/core-web-vitals`,
+      Vitest, Playwright, and `next build` with standalone output.
+- [ ] **Design system gate**: Frontend plans identify the relevant
+      AfroUrban Design 4 recipe, page shell, and component patterns,
+      and explain any intentional deviation.
 - [ ] **Observability gate**: Structured JSON logging and request
       context strategy are defined.
 - [ ] **Toolchain gate**: All commands run through `poetry run`.
@@ -93,9 +109,12 @@ backend/
 
 frontend/
 ├── src/
+│   ├── app/
 │   ├── components/
-│   ├── pages/
-│   └── services/
+│   ├── hooks/
+│   ├── lib/
+│   ├── types/
+│   └── middleware.ts
 └── tests/
 
 # [REMOVE IF UNUSED] Option 3: Mobile + API (when "iOS/Android" detected)
