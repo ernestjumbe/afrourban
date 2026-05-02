@@ -20,14 +20,3 @@ app.config_from_object("django.conf:settings", namespace="CELERY")
 
 # Load task modules from all registered Django apps.
 app.autodiscover_tasks()
-
-# Celery Beat schedule (T017)
-app.conf.beat_schedule = {
-    "cleanup-expired-login-sessions": {
-        "task": "authentication.cleanup_expired_login_sessions",
-        "schedule": 1800.0,  # Every 30 minutes (in seconds)
-        "options": {
-            "expires": 300,  # Task expires after 5 minutes if not picked up
-        },
-    },
-}

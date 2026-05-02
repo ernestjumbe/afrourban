@@ -293,15 +293,3 @@ CELERY_TIMEZONE = "UTC"
 CELERY_TASK_TRACK_STARTED = True
 CELERY_TASK_TIME_LIMIT = 30 * 60  # 30 minutes
 CELERY_RESULT_EXPIRES = 3600  # 1 hour
-
-# Celery Beat Schedule for periodic tasks
-CELERY_BEAT_SCHEDULE = {
-    "expire-suspensions": {
-        "task": "afrourban.apps.moderation.tasks.expire_suspensions",
-        "schedule": 86400.0,  # Run daily (24 hours in seconds)
-    },
-    "execute-scheduled-deletions": {
-        "task": "afrourban.apps.users.tasks.execute_scheduled_deletions",
-        "schedule": 86400.0,  # Run daily (24 hours in seconds)
-    },
-}

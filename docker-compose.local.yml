@@ -1,4 +1,32 @@
 services:
+  frontend:
+    env_file: env/.env.docker
+    restart: unless-stopped
+    build:
+      context: ./frontend
+      dockerfile: ./Dockerfile.local
+    command: sh -lc 'npm run dev -- --hostname 0.0.0.0 --port ${FRONTEND_PORT:-3030}'
+    volumes:
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
+    ports:
+      - '${FRONTEND_PORT:-3030}:${FRONTEND_PORT:-3030}'
+    environment:
+      NODE_ENV: development
+      FRONTEND_PORT: ${FRONTEND_PORT:-3030}
+      SITE_URL: http://localhost:${FRONTEND_PORT:-3030}
+      API_URL: ${API_URL:-http://django:8000/api/v1}
+      AUTH_TRUST_HOST: ${AUTH_TRUST_HOST:-false}
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- "http://127.0.0.1:${FRONTEND_PORT:-3030}/" >/dev/null 2>&1 || exit 1']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    depends_on:
+      django:
+        condition: service_started
+
   django:
     env_file: env/.env.docker
     restart: unless-stopped
@@ -21,7 +49,7 @@ services:
     env_file: env/.env.docker
     build:
       context: .
-      target: builder
+      target: runtime
       dockerfile: ./compose/local/django/Dockerfile
     command: celery -A afrourban.celery:app worker -l INFO
     volumes:
@@ -61,3 +89,6 @@ services:
       - 5557:5555
     depends_on:
       - celery_worker
+
+volumes:
+  frontend_node_modules:

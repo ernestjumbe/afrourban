@@ -187,3 +187,14 @@ static/
 # Ansible inventory files with sensitive connection details
 ansible/afrourban.txt
 ansible/afrourban-user.txt
+
+# Frontend workspace
+frontend/node_modules/
+frontend/.next/
+frontend/next-env.d.ts
+frontend/playwright-report/
+frontend/test-results/
+frontend/.env.local
+frontend/.env.development.local
+frontend/.env.test.local
+frontend/.env.production.local
