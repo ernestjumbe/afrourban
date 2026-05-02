@@ -11,6 +11,9 @@ __pycache__/
 venv/
 env/
 node_modules/
+frontend/node_modules/
+.next/
+frontend/.next/
 *.log
 *.log.*
 coverage/
@@ -37,3 +40,5 @@ Thumbs.db
 specs/
 README.md
 docker-compose*.yml
+frontend/playwright-report/
+frontend/test-results/

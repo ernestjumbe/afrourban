@@ -1,6 +1,6 @@
 # afrourban Development Guidelines
 
-Auto-generated from all feature plans. Last updated: 2026-03-27
+Auto-generated from all feature plans. Last updated: 2026-05-02
 
 ## Active Technologies
 - PostgreSQL (via psycopg2-binary) (001-user-profile-apps)
@@ -9,6 +9,8 @@ Auto-generated from all feature plans. Last updated: 2026-03-27
 - PostgreSQL (SQLite for local dev) — new `EmailVerificationToken` table; `is_email_verified` field on `CustomUser` (003-email-verification-registration)
 - Python 3.11+ + Django 5.1.2, Django REST Framework, SimpleJWT, py_webauthn (004-passkey-auth)
 - PostgreSQL (prod), SQLite (local/test) — new `WebAuthnCredential` model (004-passkey-auth)
+- Python 3.11 for the existing backend; Node.js 20 LTS + TypeScript 5.x for the new frontend + Next.js App Router, React 19, Zod, ESLint `next/core-web-vitals`, Vitest, Playwright, existing Docker Compose stack; Auth.js v5 reserved for future protected routes (011-nextjs-frontend-app)
+- N/A for the delivered homepage; file-based frontend source, static assets, and environment configuration only (011-nextjs-frontend-app)
 
 - Python ^3.11 + Django 5.1.x, djangorestframework, djangorestframework-simplejwt, Pillow (profile images) (001-user-profile-apps)
 
@@ -29,9 +31,9 @@ cd src [ONLY COMMANDS FOR ACTIVE TECHNOLOGIES][ONLY COMMANDS FOR ACTIVE TECHNOLO
 Python ^3.11: Follow standard conventions
 
 ## Recent Changes
+- 011-nextjs-frontend-app: Added Python 3.11 for the existing backend; Node.js 20 LTS + TypeScript 5.x for the new frontend + Next.js App Router, React 19, Zod, ESLint `next/core-web-vitals`, Vitest, Playwright, existing Docker Compose stack; Auth.js v5 reserved for future protected routes
 - 004-passkey-auth: Added Python 3.11+ + Django 5.1.2, Django REST Framework, SimpleJWT, py_webauthn
 - 003-email-verification-registration: Added Python ^3.11 + Django 5.1.x, Django REST Framework, `rest_framework_simplejwt`, `structlog`, `factory_boy` (tests)
-- 002-age-verification-field: Added Python ^3.11 + Django 5.1.x, djangorestframework, djangorestframework-simplejwt (from feature 001)
 
 
 <!-- MANUAL ADDITIONS START -->
