@@ -14,6 +14,7 @@ from afrourban.api_schema import (
     PublicSchemaAPIView,
     PublicSchemaSwaggerView,
 )
+from events.urls import api_v1_urlpatterns as events_api_v1_urlpatterns
 from health.urls import api_v1_urlpatterns as health_api_v1_urlpatterns
 from organizations.urls import api_v1_urlpatterns as organizations_api_v1_urlpatterns
 from profiles.urls import api_v1_urlpatterns as profiles_api_v1_urlpatterns
@@ -22,6 +23,7 @@ from users.urls import api_v1_urlpatterns as users_api_v1_urlpatterns
 api_v1_module_urlpatterns = [
     path("", include((health_api_v1_urlpatterns, "health-v1"))),
     path("", include((users_api_v1_urlpatterns, "users-v1"))),
+    path("events/", include((events_api_v1_urlpatterns, "events-v1"))),
     path(
         "organizations/",
         include((organizations_api_v1_urlpatterns, "organizations-v1")),

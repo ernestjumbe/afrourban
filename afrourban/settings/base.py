@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     "users",
     "profiles",
     "organizations",
+    "events",
 ]
 
 MIDDLEWARE = [
@@ -235,6 +236,11 @@ LOGGING = {
             "propagate": False,
         },
         "organizations": {
+            "handlers": ["console"],
+            "level": "DEBUG",
+            "propagate": False,
+        },
+        "events": {
             "handlers": ["console"],
             "level": "DEBUG",
             "propagate": False,

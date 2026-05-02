@@ -35,4 +35,14 @@ Python ^3.11: Follow standard conventions
 
 
 <!-- MANUAL ADDITIONS START -->
+## Constitution Overrides
+
+- Frontend work MUST use Next.js App Router under `frontend/src/app`; Pages Router usage is forbidden.
+- Frontend route segments MUST colocate route-local components, logic, and types.
+- React Server Components MUST be the default; add `'use client'` only for browser APIs, event handlers, or client hooks.
+- The Next.js server MUST act as the BFF. Client code MUST NOT call the external Django API directly.
+- Frontend authentication MUST use Auth.js v5 Credentials against the Django API with encrypted session token storage and server-side refresh rotation.
+- Frontend validation and quality gates MUST use Zod, TypeScript strict mode, ESLint `next/core-web-vitals`, Vitest, Playwright, and `next build` with `output: 'standalone'`.
+- Frontend UI MUST follow AfroUrban Design 4 guidance in `guide/FRONTEND_DESIGN_SYSTEM.md`, `guide/COMPONENT_GUIDE.md`, and `guide/RECIPES.md`.
+- Pages MUST use the closest documented recipe and preserve the dark-first editorial visual language: gold trim, serif narrative headings, uppercase tracked sans UI, gold primary actions, terracotta category accents, restrained motion, and no dashboard/SaaS styling drift.
 <!-- MANUAL ADDITIONS END -->

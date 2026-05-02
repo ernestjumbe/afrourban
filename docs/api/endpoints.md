@@ -27,6 +27,11 @@ their documentation visibility.
 | POST | `/api/v1/auth/passkey/add/complete/` | authenticated | authenticated user | no | yes |
 | GET | `/api/v1/auth/passkey/` | authenticated | authenticated user | no | yes |
 | DELETE | `/api/v1/auth/passkey/{credential_id}/` | authenticated | authenticated user | no | yes |
+| POST | `/api/v1/events/` | authenticated | authenticated user | no | yes |
+| GET | `/api/v1/events/{event_id}/` | authenticated | authenticated user | no | yes |
+| PATCH | `/api/v1/events/{event_id}/` | authenticated | personal owner or organization owner | no | yes |
+| POST | `/api/v1/events/{event_id}/cover/` | authenticated | personal owner or organization owner | no | yes |
+| DELETE | `/api/v1/events/{event_id}/cover/` | authenticated | personal owner or organization owner | no | yes |
 | GET | `/api/v1/profiles/me/` | authenticated | authenticated user | no | yes |
 | PATCH | `/api/v1/profiles/me/` | authenticated | authenticated user | no | yes |
 | POST | `/api/v1/profiles/me/avatar/` | authenticated | authenticated user | no | yes |
@@ -147,3 +152,23 @@ their documentation visibility.
   return `403` Problem Details responses
 - Organizations endpoints appear in the internal schema only and remain absent
   from the public schema because all reads and writes require authentication
+
+## Events App
+
+- Namespace: `/api/v1/events/`
+- Auth scope: all events endpoints are authenticated in `v1`
+- Active routes:
+  `POST /api/v1/events/`,
+  `GET`/`PATCH /api/v1/events/{event_id}/`, and
+  `POST`/`DELETE /api/v1/events/{event_id}/cover/`
+- Create requests support both personal events and organization-owned events
+  when the authenticated actor owns the selected organization
+- Detail reads are available to any authenticated viewer
+- Metadata writes are limited to the personal event owner or the current owner
+  of the event's organization
+- Successful updates to `title`, `start_at`, `end_at`, and `location` create
+  immutable audit rows; organizer context remains immutable after creation
+- Cover-image uploads accept JPEG, PNG, and WebP files up to 5MB and follow the
+  same write-permission rules as metadata updates
+- Events endpoints appear in the internal schema only and remain absent from
+  the public schema because all reads and writes require authentication
